@@ -1,0 +1,23 @@
+* Tests
+
+#+BEGIN_SRC elisp
+(org-pm-get-source-file-path "project1" nil)
+#+END_SRC
+
+#+RESULTS:
+: /Users/iani/.org-pm-exports/org/project1/index.org
+
+
+#+BEGIN_SRC elisp
+(org-pm-get-source-file-path "project1" nil)
+#+END_SRC
+
+#+RESULTS:
+: /Users/iani/.org-pm-exports/org/project1/index.org
+
+#+BEGIN_SRC elisp
+(org-pm-save-org-source "project1" nil nil nil)
+#+END_SRC
+
+#+RESULTS:
+: #<buffer project1>
