@@ -3,20 +3,56 @@
 #+OPTIONS: num:5 toc:3 H:5
 #+_test-project1-filename: index.org
 
-
-* Variables, path construction
-
-** general option and persistency variables
+* Master command
 
 #+BEGIN_SRC emacs-lisp
-  (defvar org-pm-registered-projects-property "PM_PROJECTS")
+  (defun org-pm-menu ()
+    "Top level menu of common org-pm commands."
+    (interactive)
+    (command-execute
+     (intern
+      (concat
+       "org-pm-"
+       (replace-regexp-in-string
+        " " "-"
+        (grizzl-completing-read
+         " === SELECT ACTION: === "
+         (grizzl-make-index
+          (reverse '(
+                     "publish file"
+                     "publish subtree"
+                     "dired root directory"
+                     "dired source directory"
+                     "dired target directory"
+                     "republish entire project"
+                     "open last published file"
+                     "make project")))))))))
 
-  (defvar org-pm-source-dir "/SOURCE")
+  (defun org-pm-publish-file (&optional project)
+    (interactive)
+    (org-pm-publish-file-or-subtree (or project (org-pm-choose-project))))
 
-  (defvar org-pm-last-saved-source-path ""
-    "org-pm-last-exported-file-path is computed from this variable.")
+  (defun org-pm-publish-subtree (&optional project)
+    (interactive)
+    (org-pm-publish-file-or-subtree (or project (org-pm-choose-project)) t))
+
+  (defun org-pm-choose-project (&optional project)
+    (setq
+     org-pm-last-chosen-project
+     (let* ((projects (org-pm-list-projects))
+            (default (or
+                      (car (memq org-pm-last-chosen-project projects))
+                      (car projects))))
+       (if projects
+           (grizzl-completing-read
+            "=== CHOOSE PROJECT: ==="
+            (grizzl-make-index
+             (reverse (delete-dups (append projects (list default))))))
+         (org-pm-make-project)))))
 
 #+END_SRC
+
+* Variables, path construction
 
 ** directory + file paths, variables and construction functions
 #+BEGIN_SRC emacs-lisp
@@ -82,6 +118,18 @@
      ".html"))
 #+END_SRC
 
+** general option and persistency variables
+
+#+BEGIN_SRC emacs-lisp
+  (defvar org-pm-registered-projects-property "PM_PROJECTS")
+
+  (defvar org-pm-source-dir "/SOURCE")
+
+  (defvar org-pm-last-saved-source-path ""
+    "org-pm-last-exported-file-path is computed from this variable.")
+
+#+END_SRC
+
 ** Source and target file paths
 
 #+BEGIN_SRC emacs-lisp
@@ -126,6 +174,67 @@
            (full-dir (if subdir (concat maindir "/" subdir) maindir)))
       (unless (file-exists-p full-dir) (mkdir full-dir t))
       full-dir))
+#+END_SRC
+* User interface (commands, menu, keybindings)
+
+#+BEGIN_SRC emacs-lisp
+  (defun org-pm-select-project-then-action ()
+    (interactive)
+    (let ((project (org-pm-choose-project))
+          (action (org-pm-select-action)))
+      (funcall action project)))
+
+  (defun org-pm-select-action-then-project ()
+    "Project selection is provided by the action, if needed."
+    (interactive)
+    (funcall (org-pm-select-action)))
+
+  (global-set-key (kbd "H-m") 'org-pm-select-action-then-project)
+  (global-set-key (kbd "H-M") 'org-pm-select-project-then-action)
+
+  (defun org-pm-select-action ()
+    (intern
+     (concat
+      "org-pm-"
+      (replace-regexp-in-string
+       " " "-"
+       (grizzl-completing-read
+        " === SELECT ACTION: === "
+        (grizzl-make-index
+         '("make project"
+           "dired root directory"
+           "dired source directory"
+           "dired target directory"
+           "publish subtree"
+           "publish file"
+           "republish entire project"
+           "open last published file")))))))
+
+
+  (defun org-pm-republish-entire-project (&optional project)
+    "Republish entire source of PROJECT."
+    (interactive)
+    (org-pm-publish (or project (org-pm-choose-project)) t))
+
+  (defun org-pm-dired-root-directory (&optional dummy)
+    (interactive)
+    (dired org-pm-root-dir))
+
+  (defun org-pm-dired-source-directory (&optional project)
+    (interactive)
+    (dired (org-pm-get-source-dir (or project (org-pm-choose-project)))))
+
+  (defun org-pm-dired-target-directory (&optional project)
+    (interactive)
+    (dired (org-pm-get-target-dir (or project (org-pm-choose-project)))))
+
+  (defun org-pm-open-last-published-file (&optional dummy)
+    (interactive)
+    (let ((path (org-pm-last-exported-file-path)))
+      (if (and path (file-exists-p path))
+          (shell-command (concat "open " path))
+        (message "No file found to open: %s" path))))
+
 #+END_SRC
 
 * Main functions
@@ -371,88 +480,6 @@
 :PROPERTIES:
 :DATE:     <2015-03-31 Tue 10:47>
 :END:
-* User interface (commands, menu, keybindings)
-
-#+BEGIN_SRC emacs-lisp
-  (defun org-pm-choose-project (&optional project)
-    (setq
-     org-pm-last-chosen-project
-     (let* ((projects (org-pm-list-projects))
-            (default (or
-                      (car (memq org-pm-last-chosen-project projects))
-                      (car projects))))
-       (if projects
-           (grizzl-completing-read
-            "=== CHOOSE PROJECT: ==="
-            (grizzl-make-index
-             (reverse (delete-dups (append projects (list default))))))
-         (org-pm-make-project)))))
-
-  (defun org-pm-select-project-then-action ()
-    (interactive)
-    (let ((project (org-pm-choose-project))
-          (action (org-pm-select-action)))
-      (funcall action project)))
-
-  (defun org-pm-select-action-then-project ()
-    "Project selection is provided by the action, if needed."
-    (interactive)
-    (funcall (org-pm-select-action)))
-
-  (global-set-key (kbd "H-m") 'org-pm-select-action-then-project)
-  (global-set-key (kbd "H-M") 'org-pm-select-project-then-action)
-
-  (defun org-pm-select-action ()
-    (intern
-     (concat
-      "org-pm-"
-      (replace-regexp-in-string
-       " " "-"
-       (grizzl-completing-read
-        " === SELECT ACTION: === "
-        (grizzl-make-index
-         '("make project"
-           "dired root directory"
-           "dired source directory"
-           "dired target directory"
-           "publish subtree"
-           "publish file"
-           "republish entire project"
-           "open last published file")))))))
-
-  (defun org-pm-publish-file (&optional project)
-    (interactive)
-    (org-pm-publish-file-or-subtree (or project (org-pm-choose-project))))
-
-  (defun org-pm-publish-subtree (&optional project)
-    (interactive)
-    (org-pm-publish-file-or-subtree (or project (org-pm-choose-project)) t))
-
-  (defun org-pm-republish-entire-project (&optional project)
-    "Republish entire source of PROJECT."
-    (interactive)
-    (org-pm-publish (or project (org-pm-choose-project)) t))
-
-  (defun org-pm-dired-root-directory (&optional dummy)
-    (interactive)
-    (dired org-pm-root-dir))
-
-  (defun org-pm-dired-source-directory (&optional project)
-    (interactive)
-    (dired (org-pm-get-source-dir (or project (org-pm-choose-project)))))
-
-  (defun org-pm-dired-target-directory (&optional project)
-    (interactive)
-    (dired (org-pm-get-target-dir (or project (org-pm-choose-project)))))
-
-  (defun org-pm-open-last-published-file (&optional dummy)
-    (interactive)
-    (let ((path (org-pm-last-exported-file-path)))
-      (if (and path (file-exists-p path))
-          (shell-command (concat "open " path))
-        (message "No file found to open: %s" path))))
-
-#+END_SRC
 
 * Provide package org-pm
 #+BEGIN_SRC emacs-lisp
