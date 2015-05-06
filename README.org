@@ -1,0 +1,15 @@
+* org-pm
+
+Publish org-mode files or sections to projects created by reading specifications from a folder.
+** Features / Principles
+
+- Publish any Org-mode file or any section of it to any number of projects.
+- Zero configuration: Start publishing any file or section to an existing or new project, without having to previously configure the system at all.
+- Easy customization: Write the html, org-mode options, css and JavaScript files that are needed to customize export in files, and have these be included in the project automatically.
+** Folder structure
+
+Org-pm uses three folders:
+
+- Project definition folder :: Contains the files needed to customize project export, such as org-options, CSS, JavaScript and HTML include files.  Each immediate subfolder of the project definition folder holds the definition of a project.
+- Project export folder :: Contains source files for the export (Org-mode files) and the (html) export files that are output as the result of the export process.
+- Template folder (Optional!) ::  Contains templates for creating new projects with different styles and options.  This folder is optional.
