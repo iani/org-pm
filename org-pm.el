@@ -39,18 +39,33 @@
   as default.
 - List already exported projects for file or section marked with *, and
   present them next to the default."
-  (setq
-   org-pm-last-chosen-project
-   (let* ((projects (org-pm-list-projects))
-          (default (or
-                    (car (memq org-pm-last-chosen-project projects))
-                    (car projects))))
-     (if projects
-         (grizzl-completing-read
-          "=== CHOOSE PROJECT: ==="
-          (grizzl-make-index
-           (reverse (delete-dups (append projects (list default))))))
-       (org-pm-make-project)))))
+  (let* ((projects (org-pm-list-projects))
+         (defaults (org-pm-default-project-list subtree-p))
+         (separator (if (and projects defaults) '("===================") ()))
+         (chosen-project
+          (if projects
+              (grizzl-completing-read
+               "=== CHOOSE PROJECT: ==="
+               (grizzl-make-index
+                (reverse (delete-dups (append defaults separator projects)))))
+            (org-pm-make-project)))))
+  (if chosen-project
+      (setq org-pm-last-chosen-project chosen-project))
+  chosen-project)
+
+(defun org-pm-default-project-list (&optional subtree-p)
+  "Present list of default projects for user to choose from.
+If current buffer is in org-mode, then list projects that this file or subtree
+has already been exported in.
+Else list the last project that has been exported to."
+  (if (eq (buffer-local-value 'major-mode (current-buffer)) 'org-mode)
+      ())
+  (if (list org-pm-last-chosen-project))
+  )
+
+;; (or
+;;  (car (memq org-pm-last-chosen-project projects))
+;;  (car projects))
 
 (defun org-pm-make-project (&optional project)
   "Create project folder if it does not exist.
@@ -59,14 +74,14 @@ If project with that name exists, then post a message about it.
 If project does not exist, then ask user to confirm before creating it."
   (setq project
         (or project
-            (replace-regexp-in-string
-             "[^[:alnum:]]+" "-"
-             (read-from-minibuffer "Enter name for new project: "  "project1"))))
-  (let* ((path (org-pm-get-project-dir project-name)))
+            (read-from-minibuffer "Enter name for new project: "  "project1")))
+  (setq project (replace-regexp-in-string "[^[:alnum:]]+" "-" project))
+  (let* ((path (org-pm-get-project-dir project)))
     (if (file-exists-p path)
-        (message "Project '%s' already exists.")
+        (message "Project '%s' already exists." project)
       (if (y-or-n-p (format "Really create project named '%s'?" project))
-          (mkdir path t)))
+          (mkdir path t)
+        (setq project nil)))
     project))
 
 ;; variables, path construction
@@ -87,7 +102,7 @@ May be changed to save different types of exports in different subdirs. ")
   "The name of the property for storing the subdirectory where a file
 or a subtree should be exported in the target directory.")
 
-(defvar org-pm-last-chosen-project nil
+(defvar org-pm-last-chosen-project "project1"
   "Name of last chosen project.
 Used as default for menu in org-pm-choose-project.")
 
