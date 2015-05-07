@@ -6,10 +6,17 @@
 * Master command
 :PROPERTIES:
 :ID:       8F755E3E-0D29-4B6B-A3E0-373A078E8A3E
-:eval-id:  2
+:eval-id:  4
 :END:
 
 #+BEGIN_SRC emacs-lisp
+  (global-set-key (kbd "H-e m") 'org-pm-menu)
+  (global-set-key (kbd "<f13> m") 'org-pm-menu)
+  (global-set-key (kbd "H-e f") 'org-pm-publish-file)
+  (global-set-key (kbd "<f13> f") 'org-pm-publish-file)
+  (global-set-key (kbd "H-e s") 'org-pm-publish-subtree)
+  (global-set-key (kbd "<f13> s") 'org-pm-publish-subtree)
+
   (defun org-pm-menu ()
     "Top level menu of common org-pm commands."
     (interactive)
@@ -38,9 +45,9 @@
 
   (defun org-pm-publish-subtree (&optional project)
     (interactive)
-    (org-pm-publish-file-or-subtree (or project (org-pm-choose-project)) t))
+    (org-pm-publish-file-or-subtree (or project (org-pm-choose-project t)) t))
 
-  (defun org-pm-choose-project (&optional project subtree-p)
+  (defun org-pm-choose-project (&optional subtree-p)
     "Choose a project from menu.
   - Present vertical menu with grizzl.
   - If no project exists, then create one.
@@ -48,31 +55,47 @@
     that project.
   - Offer last chosen project for file or section in current org-mode buffer
     as default.
-  - List already exported projects for file or section marked with *, and
-    present them next to the default."
-    (let* ((projects (org-pm-list-projects))
-           (defaults (org-pm-default-project-list subtree-p))
-           (separator (if (and projects defaults) '("===================") ()))
-           (chosen-project
-            (if projects
-                (grizzl-completing-read
-                 "=== CHOOSE PROJECT: ==="
-                 (grizzl-make-index
-                  (reverse (delete-dups (append defaults separator projects)))))
-              (org-pm-make-project)))))
-    (if chosen-project
-        (setq org-pm-last-chosen-project chosen-project))
-    chosen-project)
+  - Append list already exported projects for file or section, distinguishing it
+  through a separator line."
+    (let* ((existing-projects
+            (reverse (append '("====== Existing projects: ======") (org-pm-list-projects))))
+           (default-projects
+            (if (eq (buffer-local-value 'major-mode (current-buffer)) 'org-mode)
+                (if subtree-p
+                    (org-pm-get-subtree-projects)
+                  (org-pm-get-file-projects))
+              nil))
+           (default-project-menu
+             (if default-projects
+                 (reverse
+                  (cons
+                   (format
+                    "====== Projects which current %s already exports to are: ======"
+                    (if subtree-p "section" "file"))
+                   default-projects))
+               (reverse (cons "====== Default project: ======="
+                              (list (or org-pm-last-chosen-project "project1")))))))
+      (grizzl-completing-read
+       "=== CHOOSE EXISTING PROJECT, OR ENTER NAME TO CREATE ONE ==="
+       (grizzl-make-index
+        (reverse
+         (delete-dups
+          (append default-project-menu
+                  ;; '("====== Existing projects: ======")
+                  existing-projects)))))))
 
   (defun org-pm-default-project-list (&optional subtree-p)
     "Present list of default projects for user to choose from.
   If current buffer is in org-mode, then list projects that this file or subtree
   has already been exported in.
   Else list the last project that has been exported to."
-    (if (eq (buffer-local-value 'major-mode (current-buffer)) 'org-mode)
-        ())
-    (if (list org-pm-last-chosen-project))
-    )
+    (let ((exported-projects
+           ))
+      (if exported-projects
+          exported-projects
+        (if org-pm-last-chosen-project
+            (list org-pm-last-chosen-project)
+          nil))))
 
   ;; (or
   ;;  (car (memq org-pm-last-chosen-project projects))
@@ -430,6 +453,10 @@
 #+END_SRC
 
 * Utilities: Access to org elements and in-file projects
+:PROPERTIES:
+:ID:       12A162A2-B1DA-4C27-9613-DDF4B534AFAF
+:eval-id:  2
+:END:
 #+BEGIN_SRC emacs-lisp
   (defun org-pm-get-subtree-headline () (nth 4 (org-headline-components)))
 
