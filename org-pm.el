@@ -161,6 +161,18 @@ Create directory if needed."
     (replace-regexp-in-string org-pm-source-dir org-pm-target-subdir source-path))
    ".html"))
 
+(defun org-pm-make-project ()
+  (interactive)
+  (let ((dir
+         (org-pm-get-project-dir
+          (replace-regexp-in-string
+           "[^[:alnum:]]+" "-"
+           (read-from-minibuffer "Project name? " "test-project")))))
+    (if (file-exists-p dir)
+        (message "Project exists already at: %s" dir)
+      (progn (mkdir dir t)
+             (message "Created project at: %s" dir)))))
+
 (defvar org-pm-registered-projects-property "PM_PROJECTS")
 
 (defvar org-pm-source-dir "/SOURCE")
@@ -188,19 +200,20 @@ Create directory if needed."
 (defun org-pm-make-source-file-name (project-name subtree-p)
   (or (org-pm-get-project-attribute project-name "filename" subtree-p)
       (if subtree-p
-          (let (fname (concat
-                       (replace-regexp-in-string
-                        "[^[:alnum:]]+" "-" (org-pm-get-subtree-headline))
-                       ".org")))
+           (concat
+            (replace-regexp-in-string
+             "[^[:alnum:]]+" "-" (org-pm-get-subtree-headline))
+            ".org")
         (file-name-nondirectory (buffer-file-name)))))
 
 (defun org-pm-get-target-file-path (project-name subtree-p &optional file-type)
   "Get full path where file/subtree will be exported.
 Used to open that file for viewing (on browser etc)."
   (concat
-   (org-pm-get-target-file-dir (project-name subtree-p))
+   (org-pm-get-target-file-dir project-name subtree-p)
    (concat
-    (file-name-sans-extension (org-pm-get-make-source-file-name))
+    (file-name-sans-extension
+     (org-pm-make-source-file-name project-name subtree-p))
     (and file-type ".html"))))
 
 (defun org-pm-get-target-file-dir (project-name subtree-p)
@@ -332,7 +345,7 @@ that contains the project template."
                (subdir (org-entry-get (point) pname)))
           (if subdir (insert "#+" pname " " subdir "\n"))
           (org-paste-subtree 1)))
-    (insert-buffer contents-buffer)
+    (insert-buffer-substring contents-buffer)
     (save-buffer)
     (kill-buffer)
     (setq org-pm-last-saved-source-path source-file-path)))
@@ -412,7 +425,7 @@ to be added to the top of the org source file for publishing."
           (buffer-string))
       "")))
 
-(defun org-pm-get-subtree-headline () (nth 4 (org-headline-components)))
+(defun org-pm-get-subtree-headline () (nth 4 (org-heading-components)))
 
 (defun org-pm-get-file-and-subtree-projects ()
   (delete-dups

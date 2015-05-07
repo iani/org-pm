@@ -1,9 +1,9 @@
-#+PM_PROJECTS: testing-4-5-6 testing-3-4-5 testing-1-2-3 test-project1
+#+PM_PROJECTS: testing-1-2-3 testing-4-5-6 testing-3-4-5 test-project1
 #+TITLE: ORG-PM
 #+OPTIONS: num:5 toc:3 H:5
 #+_test-project1-filename: index.org
 
-* Master command
+* Master commands
 :PROPERTIES:
 :ID:       8F755E3E-0D29-4B6B-A3E0-373A078E8A3E
 :eval-id:  9
@@ -116,6 +116,9 @@
 #+END_SRC
 
 * Variables, path construction
+:PROPERTIES:
+:PM_PROJECTS: testing-1-2-3
+:END:
 
 ** directory + file paths, variables and construction functions
 #+BEGIN_SRC emacs-lisp
@@ -179,6 +182,18 @@
      (file-name-sans-extension
       (replace-regexp-in-string org-pm-source-dir org-pm-target-subdir source-path))
      ".html"))
+
+  (defun org-pm-make-project ()
+    (interactive)
+    (let ((dir
+           (org-pm-get-project-dir
+            (replace-regexp-in-string
+             "[^[:alnum:]]+" "-"
+             (read-from-minibuffer "Project name? " "test-project")))))
+      (if (file-exists-p dir)
+          (message "Project exists already at: %s" dir)
+        (progn (mkdir dir t)
+               (message "Created project at: %s" dir)))))
 #+END_SRC
 
 ** general option and persistency variables
@@ -194,6 +209,9 @@
 #+END_SRC
 
 ** Source and target file paths
+:PROPERTIES:
+:PM_PROJECTS: testing-1-2-3
+:END:
 
 #+BEGIN_SRC emacs-lisp
   (defun org-pm-get-source-file-path (project-name subtree-p)
@@ -216,19 +234,20 @@
   (defun org-pm-make-source-file-name (project-name subtree-p)
     (or (org-pm-get-project-attribute project-name "filename" subtree-p)
         (if subtree-p
-            (let (fname (concat
-                         (replace-regexp-in-string
-                          "[^[:alnum:]]+" "-" (org-pm-get-subtree-headline))
-                         ".org")))
+             (concat
+              (replace-regexp-in-string
+               "[^[:alnum:]]+" "-" (org-pm-get-subtree-headline))
+              ".org")
           (file-name-nondirectory (buffer-file-name)))))
 
   (defun org-pm-get-target-file-path (project-name subtree-p &optional file-type)
     "Get full path where file/subtree will be exported.
   Used to open that file for viewing (on browser etc)."
     (concat
-     (org-pm-get-target-file-dir (project-name subtree-p))
+     (org-pm-get-target-file-dir project-name subtree-p)
      (concat
-      (file-name-sans-extension (org-pm-get-make-source-file-name))
+      (file-name-sans-extension
+       (org-pm-make-source-file-name project-name subtree-p))
       (and file-type ".html"))))
 
   (defun org-pm-get-target-file-dir (project-name subtree-p)
@@ -304,6 +323,7 @@
 :PROPERTIES:
 :ID:       777717F0-B63A-429B-B731-BFB77A885539
 :eval-id:  2
+:PM_PROJECTS: testing-1-2-3
 :END:
 #+BEGIN_SRC emacs-lisp
   ;;; Main function
@@ -371,7 +391,7 @@
                  (subdir (org-entry-get (point) pname)))
             (if subdir (insert "#+" pname " " subdir "\n"))
             (org-paste-subtree 1)))
-      (insert-buffer contents-buffer)
+      (insert-buffer-substring contents-buffer)
       (save-buffer)
       (kill-buffer)
       (setq org-pm-last-saved-source-path source-file-path)))
@@ -456,9 +476,10 @@
 :PROPERTIES:
 :ID:       12A162A2-B1DA-4C27-9613-DDF4B534AFAF
 :eval-id:  2
+:PM_PROJECTS: testing-1-2-3
 :END:
 #+BEGIN_SRC emacs-lisp
-  (defun org-pm-get-subtree-headline () (nth 4 (org-headline-components)))
+  (defun org-pm-get-subtree-headline () (nth 4 (org-heading-components)))
 
   (defun org-pm-get-file-and-subtree-projects ()
     (delete-dups
