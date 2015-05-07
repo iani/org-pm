@@ -1,4 +1,11 @@
 
+(global-set-key (kbd "H-e m") 'org-pm-menu)
+(global-set-key (kbd "<f14> m") 'org-pm-menu)
+(global-set-key (kbd "H-e f") 'org-pm-publish-file)
+(global-set-key (kbd "<f14> f") 'org-pm-publish-file)
+(global-set-key (kbd "H-e s") 'org-pm-publish-subtree)
+(global-set-key (kbd "<f14> s") 'org-pm-publish-subtree)
+
 (defun org-pm-menu ()
   "Top level menu of common org-pm commands."
   (interactive)
@@ -27,9 +34,9 @@
 
 (defun org-pm-publish-subtree (&optional project)
   (interactive)
-  (org-pm-publish-file-or-subtree (or project (org-pm-choose-project)) t))
+  (org-pm-publish-file-or-subtree (or project (org-pm-choose-project t)) t))
 
-(defun org-pm-choose-project (&optional project subtree-p)
+(defun org-pm-choose-project (&optional subtree-p)
   "Choose a project from menu.
 - Present vertical menu with grizzl.
 - If no project exists, then create one.
@@ -37,52 +44,61 @@
   that project.
 - Offer last chosen project for file or section in current org-mode buffer
   as default.
-- List already exported projects for file or section marked with *, and
-  present them next to the default."
-  (let* ((projects (org-pm-list-projects))
-         (defaults (org-pm-default-project-list subtree-p))
-         (separator (if (and projects defaults) '("===================") ()))
+- Append list already exported projects for file or section, distinguishing it
+through a separator line."
+  (let* ((existing-projects
+          (reverse (append '("====== Existing projects: ======") (org-pm-list-projects))))
+         (default-projects
+          (if (eq (buffer-local-value 'major-mode (current-buffer)) 'org-mode)
+              (if subtree-p
+                  (org-pm-get-subtree-projects)
+                (org-pm-get-file-projects))
+            nil))
+         (default-project-menu
+           (if default-projects
+               (reverse
+                (cons
+                 (format
+                  "====== Projects which current %s already exports to are: ======"
+                  (if subtree-p "section" "file"))
+                 default-projects))
+             (reverse (cons "====== Default project: ======="
+                            (list (or org-pm-last-chosen-project "project1"))))))
          (chosen-project
-          (if projects
-              (grizzl-completing-read
-               "=== CHOOSE PROJECT: ==="
-               (grizzl-make-index
-                (reverse (delete-dups (append defaults separator projects)))))
-            (org-pm-make-project)))))
-  (if chosen-project
-      (setq org-pm-last-chosen-project chosen-project))
-  chosen-project)
+          (replace-regexp-in-string
+           "[^[:alnum:]]+"
+           "-"
+           (grizzl-completing-read
+            "=== CHOOSE EXISTING PROJECT, OR ENTER NAME TO CREATE ONE ==="
+            (grizzl-make-index
+             (reverse
+              (delete-dups
+               (append default-project-menu existing-projects)))))))
+         (project-path (org-pm-get-project-dir chosen-project)))
+    (unless (file-exists-p project-path)
+      (if (y-or-n-p (format "Really create project named '%s'?" chosen-project))
+          (mkdir project-path t)
+        (error
+         (format "Did not create project %s. Publishing cancelled."
+                 chosen-project))))
+    chosen-project))
 
 (defun org-pm-default-project-list (&optional subtree-p)
   "Present list of default projects for user to choose from.
 If current buffer is in org-mode, then list projects that this file or subtree
 has already been exported in.
 Else list the last project that has been exported to."
-  (if (eq (buffer-local-value 'major-mode (current-buffer)) 'org-mode)
-      ())
-  (if (list org-pm-last-chosen-project))
-  )
+  (let ((exported-projects
+         ))
+    (if exported-projects
+        exported-projects
+      (if org-pm-last-chosen-project
+          (list org-pm-last-chosen-project)
+        nil))))
 
 ;; (or
 ;;  (car (memq org-pm-last-chosen-project projects))
 ;;  (car projects))
-
-(defun org-pm-make-project (&optional project)
-  "Create project folder if it does not exist.
-If no project name is given, then prompt user for one.
-If project with that name exists, then post a message about it.
-If project does not exist, then ask user to confirm before creating it."
-  (setq project
-        (or project
-            (read-from-minibuffer "Enter name for new project: "  "project1")))
-  (setq project (replace-regexp-in-string "[^[:alnum:]]+" "-" project))
-  (let* ((path (org-pm-get-project-dir project)))
-    (if (file-exists-p path)
-        (message "Project '%s' already exists." project)
-      (if (y-or-n-p (format "Really create project named '%s'?" project))
-          (mkdir path t)
-        (setq project nil)))
-    project))
 
 ;; variables, path construction
 
@@ -255,10 +271,11 @@ Used to open that file for viewing (on browser etc)."
 
 (defun org-pm-publish-file-or-subtree (project &optional subtree-p)
   "Publish current file or subtree to a project chosen from template folder."
-  (org-add-option-or-property
-   org-pm-registered-projects-property project subtree-p)
-  (org-pm-save-org-source project subtree-p)
-  (org-pm-publish project nil))
+  (when project
+   (org-add-option-or-property
+    org-pm-registered-projects-property project subtree-p)
+   (org-pm-save-org-source project subtree-p)
+   (org-pm-publish project nil)))
 
 (defun org-pm-publish (project force)
   "Publish PROJECT, forcing re-publish of all files if FORCE."

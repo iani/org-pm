@@ -1,4 +1,4 @@
-#+PM_PROJECTS: test-project1
+#+PM_PROJECTS: testing-4-5-6 testing-3-4-5 testing-1-2-3 test-project1
 #+TITLE: ORG-PM
 #+OPTIONS: num:5 toc:3 H:5
 #+_test-project1-filename: index.org
@@ -6,16 +6,16 @@
 * Master command
 :PROPERTIES:
 :ID:       8F755E3E-0D29-4B6B-A3E0-373A078E8A3E
-:eval-id:  4
+:eval-id:  9
 :END:
 
 #+BEGIN_SRC emacs-lisp
   (global-set-key (kbd "H-e m") 'org-pm-menu)
-  (global-set-key (kbd "<f13> m") 'org-pm-menu)
+  (global-set-key (kbd "<f14> m") 'org-pm-menu)
   (global-set-key (kbd "H-e f") 'org-pm-publish-file)
-  (global-set-key (kbd "<f13> f") 'org-pm-publish-file)
+  (global-set-key (kbd "<f14> f") 'org-pm-publish-file)
   (global-set-key (kbd "H-e s") 'org-pm-publish-subtree)
-  (global-set-key (kbd "<f13> s") 'org-pm-publish-subtree)
+  (global-set-key (kbd "<f14> s") 'org-pm-publish-subtree)
 
   (defun org-pm-menu ()
     "Top level menu of common org-pm commands."
@@ -74,15 +74,25 @@
                     (if subtree-p "section" "file"))
                    default-projects))
                (reverse (cons "====== Default project: ======="
-                              (list (or org-pm-last-chosen-project "project1")))))))
-      (grizzl-completing-read
-       "=== CHOOSE EXISTING PROJECT, OR ENTER NAME TO CREATE ONE ==="
-       (grizzl-make-index
-        (reverse
-         (delete-dups
-          (append default-project-menu
-                  ;; '("====== Existing projects: ======")
-                  existing-projects)))))))
+                              (list (or org-pm-last-chosen-project "project1"))))))
+           (chosen-project
+            (replace-regexp-in-string
+             "[^[:alnum:]]+"
+             "-"
+             (grizzl-completing-read
+              "=== CHOOSE EXISTING PROJECT, OR ENTER NAME TO CREATE ONE ==="
+              (grizzl-make-index
+               (reverse
+                (delete-dups
+                 (append default-project-menu existing-projects)))))))
+           (project-path (org-pm-get-project-dir chosen-project)))
+      (unless (file-exists-p project-path)
+        (if (y-or-n-p (format "Really create project named '%s'?" chosen-project))
+            (mkdir project-path t)
+          (error
+           (format "Did not create project %s. Publishing cancelled."
+                   chosen-project))))
+      chosen-project))
 
   (defun org-pm-default-project-list (&optional subtree-p)
     "Present list of default projects for user to choose from.
@@ -101,22 +111,7 @@
   ;;  (car (memq org-pm-last-chosen-project projects))
   ;;  (car projects))
 
-  (defun org-pm-make-project (&optional project)
-    "Create project folder if it does not exist.
-  If no project name is given, then prompt user for one.
-  If project with that name exists, then post a message about it.
-  If project does not exist, then ask user to confirm before creating it."
-    (setq project
-          (or project
-              (read-from-minibuffer "Enter name for new project: "  "project1")))
-    (setq project (replace-regexp-in-string "[^[:alnum:]]+" "-" project))
-    (let* ((path (org-pm-get-project-dir project)))
-      (if (file-exists-p path)
-          (message "Project '%s' already exists." project)
-        (if (y-or-n-p (format "Really create project named '%s'?" project))
-            (mkdir path t)
-          (setq project nil)))
-      project))
+
 
 #+END_SRC
 
@@ -306,15 +301,20 @@
 #+END_SRC
 
 * Main functions
+:PROPERTIES:
+:ID:       777717F0-B63A-429B-B731-BFB77A885539
+:eval-id:  2
+:END:
 #+BEGIN_SRC emacs-lisp
   ;;; Main function
 
   (defun org-pm-publish-file-or-subtree (project &optional subtree-p)
     "Publish current file or subtree to a project chosen from template folder."
-    (org-add-option-or-property
-     org-pm-registered-projects-property project subtree-p)
-    (org-pm-save-org-source project subtree-p)
-    (org-pm-publish project nil))
+    (when project
+     (org-add-option-or-property
+      org-pm-registered-projects-property project subtree-p)
+     (org-pm-save-org-source project subtree-p)
+     (org-pm-publish project nil)))
 
   (defun org-pm-publish (project force)
     "Publish PROJECT, forcing re-publish of all files if FORCE."
