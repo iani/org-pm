@@ -1,10 +1,73 @@
 
-(defvar org-pm-registered-projects-property "PM_PROJECTS")
+(defun org-pm-menu ()
+  "Top level menu of common org-pm commands."
+  (interactive)
+  (command-execute
+   (intern
+    (concat
+     "org-pm-"
+     (replace-regexp-in-string
+      " " "-"
+      (grizzl-completing-read
+       " === SELECT ACTION: === "
+       (grizzl-make-index
+        (reverse '(
+                   "publish file"
+                   "publish subtree"
+                   "dired root directory"
+                   "dired source directory"
+                   "dired target directory"
+                   "republish entire project"
+                   "open last published file"
+                   "make project")))))))))
 
-(defvar org-pm-source-dir "/SOURCE")
+(defun org-pm-publish-file (&optional project)
+  (interactive)
+  (org-pm-publish-file-or-subtree (or project (org-pm-choose-project))))
 
-(defvar org-pm-last-saved-source-path ""
-  "org-pm-last-exported-file-path is computed from this variable.")
+(defun org-pm-publish-subtree (&optional project)
+  (interactive)
+  (org-pm-publish-file-or-subtree (or project (org-pm-choose-project)) t))
+
+(defun org-pm-choose-project (&optional project subtree-p)
+  "Choose a project from menu.
+- Present vertical menu with grizzl.
+- If no project exists, then create one.
+- If name of project entered is not in list of exising projects, then create
+  that project.
+- Offer last chosen project for file or section in current org-mode buffer
+  as default.
+- List already exported projects for file or section marked with *, and
+  present them next to the default."
+  (setq
+   org-pm-last-chosen-project
+   (let* ((projects (org-pm-list-projects))
+          (default (or
+                    (car (memq org-pm-last-chosen-project projects))
+                    (car projects))))
+     (if projects
+         (grizzl-completing-read
+          "=== CHOOSE PROJECT: ==="
+          (grizzl-make-index
+           (reverse (delete-dups (append projects (list default))))))
+       (org-pm-make-project)))))
+
+(defun org-pm-make-project (&optional project)
+  "Create project folder if it does not exist.
+If no project name is given, then prompt user for one.
+If project with that name exists, then post a message about it.
+If project does not exist, then ask user to confirm before creating it."
+  (setq project
+        (or project
+            (replace-regexp-in-string
+             "[^[:alnum:]]+" "-"
+             (read-from-minibuffer "Enter name for new project: "  "project1"))))
+  (let* ((path (org-pm-get-project-dir project-name)))
+    (if (file-exists-p path)
+        (message "Project '%s' already exists.")
+      (if (y-or-n-p (format "Really create project named '%s'?" project))
+          (mkdir path t)))
+    project))
 
 ;; variables, path construction
 
@@ -67,6 +130,13 @@ Create directory if needed."
     (replace-regexp-in-string org-pm-source-dir org-pm-target-subdir source-path))
    ".html"))
 
+(defvar org-pm-registered-projects-property "PM_PROJECTS")
+
+(defvar org-pm-source-dir "/SOURCE")
+
+(defvar org-pm-last-saved-source-path ""
+  "org-pm-last-exported-file-path is computed from this variable.")
+
 (defun org-pm-get-source-file-path (project-name subtree-p)
   (concat
    (org-pm-get-source-file-dir project-name subtree-p)
@@ -109,6 +179,63 @@ Used to open that file for viewing (on browser etc)."
     (unless (file-exists-p full-dir) (mkdir full-dir t))
     full-dir))
 
+(defun org-pm-select-project-then-action ()
+  (interactive)
+  (let ((project (org-pm-choose-project))
+        (action (org-pm-select-action)))
+    (funcall action project)))
+
+(defun org-pm-select-action-then-project ()
+  "Project selection is provided by the action, if needed."
+  (interactive)
+  (funcall (org-pm-select-action)))
+
+(global-set-key (kbd "H-m") 'org-pm-select-action-then-project)
+(global-set-key (kbd "H-M") 'org-pm-select-project-then-action)
+
+(defun org-pm-select-action ()
+  (intern
+   (concat
+    "org-pm-"
+    (replace-regexp-in-string
+     " " "-"
+     (grizzl-completing-read
+      " === SELECT ACTION: === "
+      (grizzl-make-index
+       '("make project"
+         "dired root directory"
+         "dired source directory"
+         "dired target directory"
+         "publish subtree"
+         "publish file"
+         "republish entire project"
+         "open last published file")))))))
+
+
+(defun org-pm-republish-entire-project (&optional project)
+  "Republish entire source of PROJECT."
+  (interactive)
+  (org-pm-publish (or project (org-pm-choose-project)) t))
+
+(defun org-pm-dired-root-directory (&optional dummy)
+  (interactive)
+  (dired org-pm-root-dir))
+
+(defun org-pm-dired-source-directory (&optional project)
+  (interactive)
+  (dired (org-pm-get-source-dir (or project (org-pm-choose-project)))))
+
+(defun org-pm-dired-target-directory (&optional project)
+  (interactive)
+  (dired (org-pm-get-target-dir (or project (org-pm-choose-project)))))
+
+(defun org-pm-open-last-published-file (&optional dummy)
+  (interactive)
+  (let ((path (org-pm-last-exported-file-path)))
+    (if (and path (file-exists-p path))
+        (shell-command (concat "open " path))
+      (message "No file found to open: %s" path))))
+
 ;;; Main function
 
 (defun org-pm-publish-file-or-subtree (project &optional subtree-p)
@@ -129,18 +256,6 @@ Used to open that file for viewing (on browser etc)."
   (mapcar
    (lambda (p) (file-name-nondirectory (file-name-sans-extension p)))
    (file-expand-wildcards (concat org-pm-root-dir "/*"))))
-
-(defun org-pm-make-project (&optional project)
-  (interactive)
-  (let* ((project-name
-          (or
-           project
-           (replace-regexp-in-string
-            "[^[:alnum:]]+" "-"
-            (read-from-minibuffer "Enter name for new project: "  "project1"))))
-         (path (org-pm-get-project-dir project-name)))
-    (unless (file-exists-p path) (mkdir path t))
-    project-name))
 
 (defun org-pm-create-project-plist (project-name)
   "Create org-publish-project-alist with project from template folder.
@@ -341,83 +456,5 @@ See also org-set-option-or-property."
    (lambda (x) x)
    (delete-dups (cons word (split-string (or string "") " ")))
    " "))
-
-(defun org-pm-choose-project (&optional project)
-  (setq
-   org-pm-last-chosen-project
-   (let* ((projects (org-pm-list-projects))
-          (default (or
-                    (car (memq org-pm-last-chosen-project projects))
-                    (car projects))))
-     (if projects
-         (grizzl-completing-read
-          "=== CHOOSE PROJECT: ==="
-          (grizzl-make-index
-           (reverse (delete-dups (append projects (list default))))))
-       (org-pm-make-project)))))
-
-(defun org-pm-select-project-then-action ()
-  (interactive)
-  (let ((project (org-pm-choose-project))
-        (action (org-pm-select-action)))
-    (funcall action project)))
-
-(defun org-pm-select-action-then-project ()
-  "Project selection is provided by the action, if needed."
-  (interactive)
-  (funcall (org-pm-select-action)))
-
-(global-set-key (kbd "H-m") 'org-pm-select-action-then-project)
-(global-set-key (kbd "H-M") 'org-pm-select-project-then-action)
-
-(defun org-pm-select-action ()
-  (intern
-   (concat
-    "org-pm-"
-    (replace-regexp-in-string
-     " " "-"
-     (grizzl-completing-read
-      " === SELECT ACTION: === "
-      (grizzl-make-index
-       '("make project"
-         "dired root directory"
-         "dired source directory"
-         "dired target directory"
-         "publish subtree"
-         "publish file"
-         "republish entire project"
-         "open last published file")))))))
-
-(defun org-pm-publish-file (&optional project)
-  (interactive)
-  (org-pm-publish-file-or-subtree (or project (org-pm-choose-project))))
-
-(defun org-pm-publish-subtree (&optional project)
-  (interactive)
-  (org-pm-publish-file-or-subtree (or project (org-pm-choose-project)) t))
-
-(defun org-pm-republish-entire-project (&optional project)
-  "Republish entire source of PROJECT."
-  (interactive)
-  (org-pm-publish (or project (org-pm-choose-project)) t))
-
-(defun org-pm-dired-root-directory (&optional dummy)
-  (interactive)
-  (dired org-pm-root-dir))
-
-(defun org-pm-dired-source-directory (&optional project)
-  (interactive)
-  (dired (org-pm-get-source-dir (or project (org-pm-choose-project)))))
-
-(defun org-pm-dired-target-directory (&optional project)
-  (interactive)
-  (dired (org-pm-get-target-dir (or project (org-pm-choose-project)))))
-
-(defun org-pm-open-last-published-file (&optional dummy)
-  (interactive)
-  (let ((path (org-pm-last-exported-file-path)))
-    (if (and path (file-exists-p path))
-        (shell-command (concat "open " path))
-      (message "No file found to open: %s" path))))
 
 (provide 'org-pm)
