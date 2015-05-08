@@ -1,4 +1,4 @@
-#+PM_PROJECTS: test-project1 testing-1-2-3 testing-4-5-6 testing-3-4-5
+#+PM_PROJECTS: project1 test-project1 testing-1-2-3 testing-4-5-6 testing-3-4-5
 #+TITLE: ORG-PM
 #+OPTIONS: num:5 toc:3 H:5
 #+_test-project1-filename: index.org
@@ -20,6 +20,7 @@
 #+BEGIN_SRC emacs-lisp
   (global-set-key (kbd "H-e m") 'org-pm-menu)
   (global-set-key (kbd "<f14> m") 'org-pm-menu)
+  (global-set-key (kbd "<f14> <f14>") 'org-pm-menu)
   (global-set-key (kbd "H-e f") 'org-pm-publish-file)
   (global-set-key (kbd "<f14> f") 'org-pm-publish-file)
   (global-set-key (kbd "H-e s") 'org-pm-publish-subtree)
@@ -225,8 +226,11 @@
 
   (defun org-pm-last-exported-file-path ()
     (if org-pm-last-saved-source-path
-        (concat
-         (file-name-sans-extension org-pm-last-saved-source-path) ".html")
+        (replace-regexp-in-string
+         "/SOURCE/" ;; dangerous: if many /SOURCE/ are present ...
+         "/"
+         (concat
+          (file-name-sans-extension org-pm-last-saved-source-path) ".html"))
       nil))
 
   (defun org-pm-make-project ()
@@ -404,10 +408,11 @@
   PROJECT-NAME is the name of the project, and is the same as the folder
   that contains the project."
     (list
-     (append
-      (org-pm-make-project-base-plist project-name)
-      (org-pm-get-project-options project-name)
-      )))
+     (org-pm-make-project-base-plist project-name)
+     ;; (append
+     ;;  (org-pm-make-project-base-plist project-name)
+     ;;  (org-pm-get-project-options project-name))
+     ))
 
   (defun org-pm-make-project-base-plist (project-name)
     (list
@@ -421,13 +426,13 @@
      ;; :auto-preamble t
      ))
 
-  (defun org-pm-get-project-options (project-name)
-    (let ((options-path (org-pm-get-options-path project-name)))
-      (if (file-exists-p options-path)
-          (with-temp-buffer
-               (insert-file-contents options-path)
-               (org-export-get-environment))
-        ())))
+  ;; (defun org-pm-get-project-options (project-name)
+  ;;   (let ((options-path (org-pm-get-options-path project-name)))
+  ;;     (if (file-exists-p options-path)
+  ;;         (with-temp-buffer
+  ;;              (insert-file-contents options-path)
+  ;;              (org-export-get-environment))
+  ;;       ())))
 
   (defun org-pm-insert-headers (backend)
     "Insert org-publish headers to current buffer before publishing.
@@ -464,14 +469,15 @@
                   (concat
                    (mapconcat (lambda (x) "../") (split-string subdir "/") "")
                    relative-path)))
-        (dolist (path (file-expand-wildcards (concat includes-path "/*.css")))
-          (setq includes-string
-                (concat
-                 includes-string
-                 "#+HTML_HEAD_EXTRA: <link rel=\"stylesheet\" href=\""
-                 relative-path
-                 (file-name-nondirectory path)
-                 "\"/>\n")))
+         (dolist (path (file-expand-wildcards (concat includes-path "/*.css")))
+           (setq includes-string
+                 (concat
+                  includes-string
+                  ;;
+                  "#+HTML_HEAD_EXTRA: <link rel=\"stylesheet\" href=\""
+                  relative-path
+                  (file-name-nondirectory path)
+                  "\"/>\n")))
         (dolist (path (file-expand-wildcards (concat includes-path "/*.js")))
           (setq includes-string
                 (concat
@@ -500,7 +506,7 @@
             (goto-char (point-min))
             (while (re-search-forward "^" nil t)
               (replace-match (concat "#+" head-type ": ")))
-            (buffer-string))
+            (concat (buffer-string) "\n"))
         "")))
 #+END_SRC
 
@@ -508,7 +514,7 @@
 :PROPERTIES:
 :ID:       12A162A2-B1DA-4C27-9613-DDF4B534AFAF
 :eval-id:  2
-:PM_PROJECTS: testing-1-2-3
+:PM_PROJECTS: project1 testing-1-2-3
 :END:
 #+BEGIN_SRC emacs-lisp
   (defun org-pm-get-subtree-headline () (nth 4 (org-heading-components)))

@@ -4,6 +4,7 @@
 
 (global-set-key (kbd "H-e m") 'org-pm-menu)
 (global-set-key (kbd "<f14> m") 'org-pm-menu)
+(global-set-key (kbd "<f14> <f14>") 'org-pm-menu)
 (global-set-key (kbd "H-e f") 'org-pm-publish-file)
 (global-set-key (kbd "<f14> f") 'org-pm-publish-file)
 (global-set-key (kbd "H-e s") 'org-pm-publish-subtree)
@@ -198,8 +199,11 @@ Create directory if needed."
 
 (defun org-pm-last-exported-file-path ()
   (if org-pm-last-saved-source-path
-      (concat
-       (file-name-sans-extension org-pm-last-saved-source-path) ".html")
+      (replace-regexp-in-string
+       "/SOURCE/" ;; dangerous: if many /SOURCE/ are present ...
+       "/"
+       (concat
+        (file-name-sans-extension org-pm-last-saved-source-path) ".html"))
     nil))
 
 (defun org-pm-make-project ()
@@ -353,10 +357,11 @@ Used to open that file for viewing (on browser etc)."
 PROJECT-NAME is the name of the project, and is the same as the folder
 that contains the project."
   (list
-   (append
-    (org-pm-make-project-base-plist project-name)
-    (org-pm-get-project-options project-name)
-    )))
+   (org-pm-make-project-base-plist project-name)
+   ;; (append
+   ;;  (org-pm-make-project-base-plist project-name)
+   ;;  (org-pm-get-project-options project-name))
+   ))
 
 (defun org-pm-make-project-base-plist (project-name)
   (list
@@ -370,13 +375,13 @@ that contains the project."
    ;; :auto-preamble t
    ))
 
-(defun org-pm-get-project-options (project-name)
-  (let ((options-path (org-pm-get-options-path project-name)))
-    (if (file-exists-p options-path)
-        (with-temp-buffer
-             (insert-file-contents options-path)
-             (org-export-get-environment))
-      ())))
+;; (defun org-pm-get-project-options (project-name)
+;;   (let ((options-path (org-pm-get-options-path project-name)))
+;;     (if (file-exists-p options-path)
+;;         (with-temp-buffer
+;;              (insert-file-contents options-path)
+;;              (org-export-get-environment))
+;;       ())))
 
 (defun org-pm-insert-headers (backend)
   "Insert org-publish headers to current buffer before publishing.
@@ -413,14 +418,15 @@ string and to be add it to the top of the org source file for publishing."
                 (concat
                  (mapconcat (lambda (x) "../") (split-string subdir "/") "")
                  relative-path)))
-      (dolist (path (file-expand-wildcards (concat includes-path "/*.css")))
-        (setq includes-string
-              (concat
-               includes-string
-               "#+HTML_HEAD_EXTRA: <link rel=\"stylesheet\" href=\""
-               relative-path
-               (file-name-nondirectory path)
-               "\"/>\n")))
+       (dolist (path (file-expand-wildcards (concat includes-path "/*.css")))
+         (setq includes-string
+               (concat
+                includes-string
+                ;;
+                "#+HTML_HEAD_EXTRA: <link rel=\"stylesheet\" href=\""
+                relative-path
+                (file-name-nondirectory path)
+                "\"/>\n")))
       (dolist (path (file-expand-wildcards (concat includes-path "/*.js")))
         (setq includes-string
               (concat
@@ -449,7 +455,7 @@ string and to be add it to the top of the org source file for publishing."
           (goto-char (point-min))
           (while (re-search-forward "^" nil t)
             (replace-match (concat "#+" head-type ": ")))
-          (buffer-string))
+          (concat (buffer-string) "\n"))
       "")))
 
 (defun org-pm-get-subtree-headline () (nth 4 (org-heading-components)))
