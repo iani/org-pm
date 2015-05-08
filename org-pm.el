@@ -1,4 +1,7 @@
 
+(require 'grizzl)
+(require 'dash)
+
 (global-set-key (kbd "H-e m") 'org-pm-menu)
 (global-set-key (kbd "<f14> m") 'org-pm-menu)
 (global-set-key (kbd "H-e f") 'org-pm-publish-file)
@@ -225,6 +228,7 @@ Create directory if needed."
    (org-pm-make-source-file-name project-name subtree-p)))
 
 (defun org-pm-query-source-file-path (project-name subtree-p)
+  ;; TODO: when queried path is different from default, then save it in property
   (concat
    (org-pm-get-source-file-dir project-name subtree-p)
    "/"

@@ -3,6 +3,13 @@
 #+OPTIONS: num:5 toc:3 H:5
 #+_test-project1-filename: index.org
 
+* Required packages
+
+#+BEGIN_SRC emacs-lisp
+(require 'grizzl)
+(require 'dash)
+#+END_SRC
+
 * Master commands
 :PROPERTIES:
 :ID:       8F755E3E-0D29-4B6B-A3E0-373A078E8A3E
