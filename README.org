@@ -23,17 +23,17 @@ For example, the following directory structure defines two projects, =project1= 
                  /project2
 #+END_EXAMPLE
 
-Each project directory has the following structure:
+=org-pm= stores the =Org-mode= source files of the project in that projects directory, under sub-directory =SOURCE=.  The exported files output by publishing the project are placed directly inside the top level of the project directory.  The project =SOURCE= directory is scanned recursively, and the directory structure of the source is preserved in the exported files directory structure.
+
+Furthermore, each project directory may optionally contain the following sub-directories:
 - Directory =CONFIG= :: Contains =html= and =org= files used to configure the org-mode options of the project and provide headers and other html parts.
 - Directory =includes= :: Contains =css= and =js= files that are included in the final project's pages through the standard header mechanism.
 - Directory =scripts= :: Contains shell scripts for deploying the site.
 
 The project's html is exported inside the top level of the project folder.
 
-Here is an example of a project folder:
-
 #+BEGIN_EXAMPLE
-: project1
+project1
     directory CONFIG:
           options.org      (contains the options for configuring export)
           HTML_HEAD.html   (contains the HTML_HEAD part for export)
@@ -52,9 +52,5 @@ Here is an example of a project folder:
 =org-pm= places the org files that are used to create the project site inside the SOURCE folder.
 
 *** Templates directory
-:LOGBOOK:
-- State "DELEGATE_DONE" from "DELEGATED"  [2015-05-08 Fri 06:45]
-- State "DELEGATE_DONE" from ""           [2015-05-08 Fri 06:45]
-:END:
 
 /Note: Feature in preparation: Templates directory.  The templates directory will hold templates for creating new projects with different styles and options./
