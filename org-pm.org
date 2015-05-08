@@ -260,6 +260,7 @@
      (org-pm-make-source-file-name project-name subtree-p)))
 
   (defun org-pm-query-source-file-path (project-name subtree-p)
+    ;; TODO: when queried path is different from default, then save it in property
     (concat
      (org-pm-get-source-file-dir project-name subtree-p)
      "/"
