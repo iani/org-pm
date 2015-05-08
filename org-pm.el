@@ -36,6 +36,45 @@
   (interactive)
   (org-pm-publish-file-or-subtree (or project (org-pm-choose-project t)) t))
 
+(defun org-pm-publish-file-or-subtree (project &optional subtree-p)
+  "Publish current file or subtree to a project chosen from template folder."
+  (when project
+    (org-add-option-or-property
+     org-pm-registered-projects-property project subtree-p)
+    (org-pm-save-org-source project subtree-p)
+    (org-pm-publish project nil)))
+
+(defun org-pm-save-org-source (project-name subtree-p)
+  (save-buffer)
+  (let* ((contents-buffer (current-buffer))
+         (contents-path (or (buffer-file-name) (buffer-name)))
+         (source-file-path (org-pm-query-source-file-path project-name subtree-p))
+         (source-file-dir (file-name-directory source-file-path)))
+    (if subtree-p (org-copy-subtree))
+    (unless (file-exists-p source-file-dir) (mkdir source-file-dir t))
+    (find-file source-file-path)
+    (erase-buffer)
+    (insert "#+EXPORT_DATE: "
+            (format-time-string "%A %d %B %Y %T %Z\n")
+            "#+SOURCE: "
+            contents-path
+            "\n")
+    ;; If excerpting from subtree, then
+    ;; subfolder must be stored in file now, to be used later
+    ;; by org-export-before-parsing hook function org-pm-insert-headers
+    ;; (if wnole-file, then any subdir spec will already be in place).
+    (if subtree-p
+        (let* ((pname
+                (org-pm-compose-project-attribute-name
+                 project-name org-pm-subdir-property-name))
+               (subdir (org-entry-get (point) pname)))
+          (if subdir (insert "#+" pname " " subdir "\n"))
+          (org-paste-subtree 1))
+      (insert-buffer-substring contents-buffer))
+    (save-buffer)
+    (kill-buffer)
+    (setq org-pm-last-saved-source-path source-file-path)))
+
 (defun org-pm-choose-project (&optional subtree-p)
   "Choose a project from menu.
 - Present vertical menu with grizzl.
@@ -126,6 +165,10 @@ Used as default for menu in org-pm-choose-project.")
   "Return the root directory for project named PROJECT-NAME."
   (expand-file-name (concat org-pm-root-dir "/" project-name)))
 
+(defun org-pm-get-options-path (project-name)
+  "Return the path of the options file for project named PROJECT-NAME."
+  (concat (org-pm-get-config-dir project-name) "/options.org"))
+
 (defun org-pm-get-config-dir (project-name)
   "Return the config directory for project named PROJECT-NAME."
   (concat (org-pm-get-project-dir project-name) "/CONFIG"))
@@ -158,7 +201,8 @@ Create directory if needed."
 (defun org-pm-make-export-path-from-source-path (source-path)
   (concat
    (file-name-sans-extension
-    (replace-regexp-in-string org-pm-source-dir org-pm-target-subdir source-path))
+    (replace-regexp-in-string
+     org-pm-source-dir org-pm-target-subdir source-path))
    ".html"))
 
 (defun org-pm-make-project ()
@@ -185,6 +229,18 @@ Create directory if needed."
    (org-pm-get-source-file-dir project-name subtree-p)
    "/"
    (org-pm-make-source-file-name project-name subtree-p)))
+
+(defun org-pm-query-source-file-path (project-name subtree-p)
+  (concat
+   (org-pm-get-source-file-dir project-name subtree-p)
+   "/"
+   (replace-regexp-in-string
+    "[^[:alnum:]]+" "-"
+    (read-from-minibuffer
+     (format "Save %s as: " (if subtree-p "section" "file"))
+     (file-name-sans-extension
+      (org-pm-make-source-file-name project-name subtree-p))))
+   ".org"))
 
 (defun org-pm-get-source-file-dir (project-name subtree-p)
   (let* ((maindir (org-pm-get-source-dir project-name))
@@ -282,14 +338,6 @@ Used to open that file for viewing (on browser etc)."
 
 ;;; Main function
 
-(defun org-pm-publish-file-or-subtree (project &optional subtree-p)
-  "Publish current file or subtree to a project chosen from template folder."
-  (when project
-   (org-add-option-or-property
-    org-pm-registered-projects-property project subtree-p)
-   (org-pm-save-org-source project subtree-p)
-   (org-pm-publish project nil)))
-
 (defun org-pm-publish (project force)
   "Publish PROJECT, forcing re-publish of all files if FORCE."
   (let ((org-publish-project-alist (org-pm-create-project-plist project))
@@ -305,50 +353,32 @@ Used to open that file for viewing (on browser etc)."
 (defun org-pm-create-project-plist (project-name)
   "Create org-publish-project-alist with project from template folder.
 PROJECT-NAME is the name of the project, and is the same as the folder
-that contains the project template."
+that contains the project."
   (list
-   ;; TODO: Merge this list with options read from config.org
-   (list
-    project-name
-    :base-directory (org-pm-get-source-dir project-name)
-    :publishing-directory (org-pm-get-target-dir project-name)
-    :base-extension "org"
-    :recursive t
-    :publishing-function 'org-html-publish-to-html
-    ;; :headline-levels 4
-    ;; :auto-preamble t
+   (append
+    (org-pm-make-project-base-plist project-name)
+    (org-pm-get-project-options project-name)
     )))
 
-(defun org-pm-save-org-source (project-name subtree-p)
-  (save-buffer)
-  (let* ((contents-buffer (current-buffer))
-         (contents-path (or (buffer-file-name) (buffer-name)))
-         (source-file-path (org-pm-get-source-file-path project-name subtree-p))
-         (source-file-dir (file-name-directory source-file-path)))
-    (if subtree-p (org-copy-subtree))
-    (unless (file-exists-p source-file-dir) (mkdir source-file-dir t))
-    (find-file source-file-path)
-    (erase-buffer)
-    (insert "#+EXPORT_DATE: "
-            (format-time-string "%A %d %B %Y %T %Z\n")
-            "#+SOURCE: "
-            contents-path
-            "\n")
-    ;; If excerpting from subtree, then
-    ;; subfolder must be stored in file now, to be used later
-    ;; by org-export-before-parsing hook function org-pm-insert-headers
-    ;; (if wnole-file, then any subdir spec will already be in place).
-    (if subtree-p
-        (let* ((pname
-                (org-pm-compose-project-attribute-name
-                 project-name org-pm-subdir-property-name))
-               (subdir (org-entry-get (point) pname)))
-          (if subdir (insert "#+" pname " " subdir "\n"))
-          (org-paste-subtree 1)))
-    (insert-buffer-substring contents-buffer)
-    (save-buffer)
-    (kill-buffer)
-    (setq org-pm-last-saved-source-path source-file-path)))
+(defun org-pm-make-project-base-plist (project-name)
+  (list
+   project-name
+   :base-directory (org-pm-get-source-dir project-name)
+   :publishing-directory (org-pm-get-target-dir project-name)
+   :base-extension "org"
+   :recursive t
+   :publishing-function 'org-html-publish-to-html
+   ;; :headline-levels 4
+   ;; :auto-preamble t
+   ))
+
+(defun org-pm-get-project-options (project-name)
+  (let ((options-path (org-pm-get-options-path project-name)))
+    (if (file-exists-p options-path)
+        (with-temp-buffer
+             (insert-file-contents options-path)
+             (org-export-get-environment))
+      ())))
 
 (defun org-pm-insert-headers (backend)
   "Insert org-publish headers to current buffer before publishing.
@@ -364,9 +394,8 @@ of project folder corresponding to PROJECT_NAME."
 
 (defun org-pm-make-includes-headers (project-name)
   "Make HTML_HEAD_EXTRA lines with links for each css and js file in includes.
-Copy all css and js files from template directory to export directory.
-For each of these files, construct a HTML_HEAD_EXTRA string,
-to be added to the top of the org source file for publishing."
+For each js or css files in includes directory, construct a HTML_HEAD_EXTRA
+string and to be add it to the top of the org source file for publishing."
   (let* ((subdir
           (concat
            org-pm-target-subdir
