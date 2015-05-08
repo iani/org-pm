@@ -195,15 +195,9 @@ Create directory if needed."
 
 (defun org-pm-last-exported-file-path ()
   (if org-pm-last-saved-source-path
-      (org-pm-make-export-path-from-source-path org-pm-last-saved-source-path)
+      (concat
+       (file-name-sans-extension org-pm-last-saved-source-path) ".html")
     nil))
-
-(defun org-pm-make-export-path-from-source-path (source-path)
-  (concat
-   (file-name-sans-extension
-    (replace-regexp-in-string
-     org-pm-source-dir org-pm-target-subdir source-path))
-   ".html"))
 
 (defun org-pm-make-project ()
   (interactive)
