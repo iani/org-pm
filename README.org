@@ -23,7 +23,7 @@ For example, the following directory structure defines two projects, =project1= 
                  /project2
 #+END_EXAMPLE
 
-=org-pm= stores the =Org-mode= source files of the project in that projects directory, under sub-directory =SOURCE=.  The exported files output by publishing the project are placed directly inside the top level of the project directory.  The project =SOURCE= directory is scanned recursively, and the directory structure of the source is preserved in the exported files directory structure.
+=org-pm= stores the =Org-mode= source files of the project in the projects' directory, under sub-directory =SOURCE=.  The exported files output by publishing the project are placed directly inside the top level of the project directory.  The project =SOURCE= directory is scanned recursively, and the directory structure of the source is preserved in the exported files directory structure.
 
 Furthermore, each project directory may optionally contain the following sub-directories:
 - Directory =CONFIG= :: Contains =html= and =org= files used to configure the org-mode options of the project and provide headers and other html parts.
