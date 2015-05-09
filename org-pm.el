@@ -438,6 +438,8 @@ string and to be add it to the top of the org source file for publishing."
     includes-string))
 
 (defun org-pm-make-options (path)
+  ;; TODO: Also convert relative paths here as in org-pm-make-html-head
+  ;; For options such as #+LINK_HOME, #+LINK_UP
   "Create string from OPTIONS file"
   (let ((file-name (file-truename (concat path "/OPTIONS.org"))))
     (if (file-exists-p file-name)
@@ -447,6 +449,10 @@ string and to be add it to the top of the org source file for publishing."
       "")))
 
 (defun org-pm-make-html-head (path head-type)
+  ;; TODO: insert replace-regexp-in-string before last return,
+  ;; to convert relative links to root for source files in subfolders.
+  ;; Project root can be indicated by {.}
+  ;; need extra argument relative-path to replace project root placeholder.
   "Create string with one HTML_HEAD(_EXTRA) per line from file in template folder."
   (let ((file-name (file-truename (concat path "/" head-type ".html"))))
     (if (file-exists-p file-name)
