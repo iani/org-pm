@@ -10,6 +10,167 @@
 (require 'dash)
 #+END_SRC
 
+* Variables, path construction
+:PROPERTIES:
+:PM_PROJECTS: testing-1-2-3
+:END:
+
+** directory + file paths, variables and construction functions
+
+Note: a reset:
+#+BEGIN_SRC elisp
+(setq org-pm-template-dirs
+    (list (concat (file-name-directory (buffer-file-name)) "/TEMPLATES/*")))
+#+END_SRC
+
+#+RESULTS:
+| /Users/iani/Documents/Dev/Emacs/org-pm//TEMPLATES/* |
+
+
+#+BEGIN_SRC emacs-lisp
+  ;; variables, path construction
+
+  (defvar org-pm-root-dir
+    (expand-file-name "~/org-pm-projects")
+    "Path to directory containing project definitions.
+  Project definitions are placed in subdirectories of this directory")
+
+  (defvar org-pm-target-subdir
+    ""
+    "Subdirectory of project dir where publish exports files to.
+  Per default, it is empty, meaning the target dir is the root of the project dir.
+  May be changed to save different types of exports in different subdirs. ")
+
+  (defvar org-pm-subdir-property-name
+    "subdirectory"
+    "The name of the property for storing the subdirectory where a file
+  or a subtree should be exported in the target directory.")
+
+  (defvar org-pm-last-chosen-project "project1"
+    "Name of last chosen project.
+  Used as default for menu in org-pm-choose-project.")
+
+  (defvar org-pm-template-dirs
+    (list (concat (file-name-directory (buffer-file-name)) "TEMPLATES/*"))
+    "List of directories containing templates")
+
+  (defun org-pm-get-project-dir (project-name)
+    "Return the root directory for project named PROJECT-NAME."
+    (expand-file-name (concat org-pm-root-dir "/" project-name)))
+
+  (defun org-pm-get-options-path (project-name)
+    "Return the path of the options file for project named PROJECT-NAME."
+    (concat (org-pm-get-config-dir project-name) "/options.org"))
+
+  (defun org-pm-get-config-dir (project-name)
+    "Return the config directory for project named PROJECT-NAME."
+    (concat (org-pm-get-project-dir project-name) "/CONFIG"))
+
+  (defun org-pm-get-source-dir (project-name)
+    "Return the org source file directory for project named PROJECT-NAME.
+  Create directory if needed."
+    (let ((dir
+           (expand-file-name
+            (concat org-pm-root-dir "/" project-name org-pm-source-dir))))
+      (unless (file-exists-p dir) (mkdir dir t))
+      dir))
+
+  (defun org-pm-get-target-dir (project-name)
+    "Return the export file directory for project named PROJECT-NAME.
+  Create directory if needed."
+    (let ((dir (concat (org-pm-get-project-dir project-name) org-pm-target-subdir)))
+      (unless (file-exists-p dir) (mkdir dir t))
+      dir))
+
+  (defun org-pm-get-includes-dir (project-name)
+    "Return source directory for includes for project named PROJECT-NAME."
+    (concat  (org-pm-get-target-dir project-name) "/includes"))
+
+  (defun org-pm-last-exported-file-path ()
+    (if org-pm-last-saved-source-path
+        (replace-regexp-in-string
+         "/SOURCE/" ;; dangerous: if many /SOURCE/ are present ...
+         "/"
+         (concat
+          (file-name-sans-extension org-pm-last-saved-source-path) ".html"))
+      nil))
+#+END_SRC
+
+** general option and persistency variables
+
+#+BEGIN_SRC emacs-lisp
+  (defvar org-pm-registered-projects-property "PM_PROJECTS")
+
+  (defvar org-pm-source-dir "/SOURCE")
+
+  (defvar org-pm-last-saved-source-path ""
+    "org-pm-last-exported-file-path is computed from this variable.")
+
+#+END_SRC
+
+** Source and target file paths
+:PROPERTIES:
+:PM_PROJECTS: testing-1-2-3
+:END:
+
+#+BEGIN_SRC emacs-lisp
+  (defun org-pm-get-source-file-path (project-name subtree-p)
+    (concat
+     (org-pm-get-source-file-dir project-name subtree-p)
+     "/"
+     (org-pm-make-source-file-name project-name subtree-p)))
+
+  (defun org-pm-query-source-file-path (project-name subtree-p)
+    ;; TODO: when queried path is different from default, then save it in property
+    (concat
+     (org-pm-get-source-file-dir project-name subtree-p)
+     "/"
+     (replace-regexp-in-string
+      "[^[:alnum:]]+" "-"
+      (read-from-minibuffer
+       (format "Save %s as: " (if subtree-p "section" "file"))
+       (file-name-sans-extension
+        (org-pm-make-source-file-name project-name subtree-p))))
+     ".org"))
+
+  (defun org-pm-get-source-file-dir (project-name subtree-p)
+    (let* ((maindir (org-pm-get-source-dir project-name))
+           (subdir (org-pm-get-subdir project-name subtree-p))
+           (full-dir (if subdir (concat maindir "/" subdir) maindir)))
+      (unless (file-exists-p full-dir) (mkdir full-dir t))
+      full-dir))
+
+  (defun org-pm-get-subdir (project-name subtree-p)
+    (org-pm-get-project-attribute
+     project-name org-pm-subdir-property-name subtree-p))
+
+  (defun org-pm-make-source-file-name (project-name subtree-p)
+    (or (org-pm-get-project-attribute project-name "filename" subtree-p)
+        (if subtree-p
+             (concat
+              (replace-regexp-in-string
+               "[^[:alnum:]]+" "-" (org-pm-get-subtree-headline))
+              ".org")
+          (file-name-nondirectory (buffer-file-name)))))
+
+  (defun org-pm-get-target-file-path (project-name subtree-p &optional file-type)
+    "Get full path where file/subtree will be exported.
+  Used to open that file for viewing (on browser etc)."
+    (concat
+     (org-pm-get-target-file-dir project-name subtree-p)
+     (concat
+      (file-name-sans-extension
+       (org-pm-make-source-file-name project-name subtree-p))
+      (and file-type ".html"))))
+
+  (defun org-pm-get-target-file-dir (project-name subtree-p)
+    (let* ((maindir (org-pm-get-target-dir project-name))
+           (subdir (org-pm-get-subdir project-name subtree-p))
+           (full-dir (if subdir (concat maindir "/" subdir) maindir)))
+      (unless (file-exists-p full-dir) (mkdir full-dir t))
+      full-dir))
+#+END_SRC
+
 * Master commands
 :PROPERTIES:
 :ID:       8F755E3E-0D29-4B6B-A3E0-373A078E8A3E
@@ -142,6 +303,40 @@
                    chosen-project))))
       chosen-project))
 
+  (defun org-pm-make-project (&optional project-name)
+    (interactive)
+    (unless project-name
+      (let ((project-index (grizzl-make-index (org-pm-list-projects))))
+        (setq project-name
+              (grizzl-completing-read
+               "Enter project name or select a project to update its template"
+               project-index))))
+    (setq project-name
+          (replace-regexp-in-string "[^[:alnum:]]+" "-" project-name))
+    (let (template-index
+          template-dir
+          (project-dir (org-pm-get-project-dir project-name)))
+      (if (file-exists-p project-dir)
+          (unless
+              (yes-or-no-p
+               (format "Project '%s' exists. Overwrite its template?" project-name))
+            (error (format "Cancelled creation of project '%s'" project-name)))
+        (mkdir project-dir t))
+      (setq template-index
+            (grizzl-make-index
+             (apply 'append
+                    (mapcar 'file-expand-wildcards org-pm-template-dirs))))
+      (setq template-dir
+            (grizzl-completing-read "Select a template: " template-index))
+       (if (file-exists-p template-dir)
+           (progn
+            (copy-directory
+             template-dir
+             (concat project-dir "/includes")
+             nil t t)
+            (message (format "Updated template for project %s" project-name)))
+         (error (format "Template not found: %s" template-dir)))))
+
   (defun org-pm-default-project-list (&optional subtree-p)
     "Present list of default projects for user to choose from.
   If current buffer is in org-mode, then list projects that this file or subtree
@@ -161,164 +356,6 @@
 
 
 
-#+END_SRC
-
-* Variables, path construction
-:PROPERTIES:
-:PM_PROJECTS: testing-1-2-3
-:END:
-
-** directory + file paths, variables and construction functions
-#+BEGIN_SRC emacs-lisp
-  ;; variables, path construction
-
-  (defvar org-pm-root-dir
-    (expand-file-name "~/org-pm-projects")
-    "Path to directory containing project definitions.
-  Project definitions are placed in subdirectories of this directory")
-
-  (defvar org-pm-target-subdir
-    ""
-    "Subdirectory of project dir where publish exports files to.
-  Per default, it is empty, meaning the target dir is the root of the project dir.
-  May be changed to save different types of exports in different subdirs. ")
-
-  (defvar org-pm-subdir-property-name
-    "subdirectory"
-    "The name of the property for storing the subdirectory where a file
-  or a subtree should be exported in the target directory.")
-
-  (defvar org-pm-last-chosen-project "project1"
-    "Name of last chosen project.
-  Used as default for menu in org-pm-choose-project.")
-
-  (defun org-pm-get-project-dir (project-name)
-    "Return the root directory for project named PROJECT-NAME."
-    (expand-file-name (concat org-pm-root-dir "/" project-name)))
-
-  (defun org-pm-get-options-path (project-name)
-    "Return the path of the options file for project named PROJECT-NAME."
-    (concat (org-pm-get-config-dir project-name) "/options.org"))
-
-  (defun org-pm-get-config-dir (project-name)
-    "Return the config directory for project named PROJECT-NAME."
-    (concat (org-pm-get-project-dir project-name) "/CONFIG"))
-
-  (defun org-pm-get-source-dir (project-name)
-    "Return the org source file directory for project named PROJECT-NAME.
-  Create directory if needed."
-    (let ((dir
-           (expand-file-name
-            (concat org-pm-root-dir "/" project-name org-pm-source-dir))))
-      (unless (file-exists-p dir) (mkdir dir t))
-      dir))
-
-  (defun org-pm-get-target-dir (project-name)
-    "Return the export file directory for project named PROJECT-NAME.
-  Create directory if needed."
-    (let ((dir (concat (org-pm-get-project-dir project-name) org-pm-target-subdir)))
-      (unless (file-exists-p dir) (mkdir dir t))
-      dir))
-
-  (defun org-pm-get-includes-dir (project-name)
-    "Return source directory for includes for project named PROJECT-NAME."
-    (concat  (org-pm-get-target-dir project-name) "/includes"))
-
-  (defun org-pm-last-exported-file-path ()
-    (if org-pm-last-saved-source-path
-        (replace-regexp-in-string
-         "/SOURCE/" ;; dangerous: if many /SOURCE/ are present ...
-         "/"
-         (concat
-          (file-name-sans-extension org-pm-last-saved-source-path) ".html"))
-      nil))
-
-  (defun org-pm-make-project ()
-    (interactive)
-    (let ((dir
-           (org-pm-get-project-dir
-            (replace-regexp-in-string
-             "[^[:alnum:]]+" "-"
-             (read-from-minibuffer "Project name? " "test-project")))))
-      (if (file-exists-p dir)
-          (message "Project exists already at: %s" dir)
-        (progn (mkdir dir t)
-               (message "Created project at: %s" dir)))))
-#+END_SRC
-
-** general option and persistency variables
-
-#+BEGIN_SRC emacs-lisp
-  (defvar org-pm-registered-projects-property "PM_PROJECTS")
-
-  (defvar org-pm-source-dir "/SOURCE")
-
-  (defvar org-pm-last-saved-source-path ""
-    "org-pm-last-exported-file-path is computed from this variable.")
-
-#+END_SRC
-
-** Source and target file paths
-:PROPERTIES:
-:PM_PROJECTS: testing-1-2-3
-:END:
-
-#+BEGIN_SRC emacs-lisp
-  (defun org-pm-get-source-file-path (project-name subtree-p)
-    (concat
-     (org-pm-get-source-file-dir project-name subtree-p)
-     "/"
-     (org-pm-make-source-file-name project-name subtree-p)))
-
-  (defun org-pm-query-source-file-path (project-name subtree-p)
-    ;; TODO: when queried path is different from default, then save it in property
-    (concat
-     (org-pm-get-source-file-dir project-name subtree-p)
-     "/"
-     (replace-regexp-in-string
-      "[^[:alnum:]]+" "-"
-      (read-from-minibuffer
-       (format "Save %s as: " (if subtree-p "section" "file"))
-       (file-name-sans-extension
-        (org-pm-make-source-file-name project-name subtree-p))))
-     ".org"))
-
-  (defun org-pm-get-source-file-dir (project-name subtree-p)
-    (let* ((maindir (org-pm-get-source-dir project-name))
-           (subdir (org-pm-get-subdir project-name subtree-p))
-           (full-dir (if subdir (concat maindir "/" subdir) maindir)))
-      (unless (file-exists-p full-dir) (mkdir full-dir t))
-      full-dir))
-
-  (defun org-pm-get-subdir (project-name subtree-p)
-    (org-pm-get-project-attribute
-     project-name org-pm-subdir-property-name subtree-p))
-
-  (defun org-pm-make-source-file-name (project-name subtree-p)
-    (or (org-pm-get-project-attribute project-name "filename" subtree-p)
-        (if subtree-p
-             (concat
-              (replace-regexp-in-string
-               "[^[:alnum:]]+" "-" (org-pm-get-subtree-headline))
-              ".org")
-          (file-name-nondirectory (buffer-file-name)))))
-
-  (defun org-pm-get-target-file-path (project-name subtree-p &optional file-type)
-    "Get full path where file/subtree will be exported.
-  Used to open that file for viewing (on browser etc)."
-    (concat
-     (org-pm-get-target-file-dir project-name subtree-p)
-     (concat
-      (file-name-sans-extension
-       (org-pm-make-source-file-name project-name subtree-p))
-      (and file-type ".html"))))
-
-  (defun org-pm-get-target-file-dir (project-name subtree-p)
-    (let* ((maindir (org-pm-get-target-dir project-name))
-           (subdir (org-pm-get-subdir project-name subtree-p))
-           (full-dir (if subdir (concat maindir "/" subdir) maindir)))
-      (unless (file-exists-p full-dir) (mkdir full-dir t))
-      full-dir))
 #+END_SRC
 * User interface (commands, menu, keybindings)
 
