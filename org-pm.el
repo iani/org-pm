@@ -25,7 +25,7 @@ or a subtree should be exported in the target directory.")
 Used as default for menu in org-pm-choose-project.")
 
 (defvar org-pm-template-dirs
-  (list (concat (file-name-directory (buffer-file-name)) "TEMPLATES/*"))
+  (list (concat (file-name-directory (or load-file-name (buffer-file-name))) "TEMPLATES/*"))
   "List of directories containing templates")
 
 (defun org-pm-get-project-dir (project-name)
