@@ -536,11 +536,13 @@ ensures that the attrubute name is always constructed in the same way."
    project-name org-pm-subdir-property-name))
 
 (defun org-get-option (option)
-  (org-with-wide-buffer
-   (goto-char (point-min))
-   (let ((found
-           (re-search-forward (org-make-options-regexp (list option)) nil t)))
-     (if found (match-string-no-properties 2) nil))))
+  (save-excursion
+    (save-restriction
+      (widen)
+      (goto-char (point-min))
+      (let ((found
+             (re-search-forward (org-make-options-regexp (list option)) nil t)))
+        (if found (match-string-no-properties 2) nil)))))
 
 (defun org-add-option-or-property (option value &optional subtree-p)
   "Add option or property value in buffer.
@@ -551,21 +553,23 @@ See also org-set-option-or-property."
     (org-add-option option value)))
 
 (defun org-add-option (option value)
-    (org-with-wide-buffer
-     (goto-char (point-min))
-     (let* ((found
-             (re-search-forward (org-make-options-regexp (list option)) nil t))
-            (found-string (if found (match-string 2) "")))
-       (if found
-           (kill-whole-line)
-         (goto-char (point-min)))
-       (insert
-        (concat
-         "#+"
-         option
-         ": "
-         (add-word-to-string-set value found-string)
-         "\n")))))
+  (save-excursion
+    (save-restriction
+      (widen)
+      (goto-char (point-min))
+      (let* ((found
+              (re-search-forward (org-make-options-regexp (list option)) nil t))
+             (found-string (if found (match-string 2) "")))
+        (if found
+            (kill-whole-line)
+          (goto-char (point-min)))
+        (insert
+         (concat
+          "#+"
+          option
+          ": "
+          (add-word-to-string-set value found-string)
+          "\n"))))))
 
 (defun org-add-property (property value)
   (org-entry-put

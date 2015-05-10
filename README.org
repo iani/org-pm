@@ -2,7 +2,7 @@
 
 * org-pm (v. 0.2.0)
 
-Publish org-mode files or sections to projects created GB reading specifications from a folder.
+Publish org-mode files or sections to projects created by reading specifications from a folder.
 ** Features / Principles
 
 - Publish any Org-mode file or any section of it to any number of projects.
