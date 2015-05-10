@@ -1,6 +1,6 @@
 #+PM_PROJECTS: project1
 
-* org-pm (v. 0.2.0)
+* org-pm (v. 0.2.2)
 
 Publish org-mode files or sections to projects created by reading specifications from a folder.
 ** Features / Principles
@@ -9,6 +9,7 @@ Publish org-mode files or sections to projects created by reading specifications
 - Zero configuration: Start publishing any file or section to an existing or new project, without any previous configuration.
 - Easy customization: Place html (header), org-mode options, css and JavaScript files in folder =includes=, and they are included in the project's definition automatically.
 - Templates for creating projects with different custom styles.
+- Optionally run script to upload site to server immediately after the publish process is completed.
 
 ** Installation, dependencies
 
