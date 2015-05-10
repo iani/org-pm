@@ -1,6 +1,6 @@
 #+PM_PROJECTS: project1
 
-* org-pm (v. 0.1.0)
+* org-pm (v. 0.2.0)
 
 Publish org-mode files or sections to projects created GB reading specifications from a folder.
 ** Features / Principles
@@ -77,3 +77,7 @@ To add your own templates, create a folder where you will put the templates, and
 #+BEGIN_SRC elisp
   (add-to-list 'org-pm-template-dirs "~/my-org-pm-templates/*")
 #+END_SRC
+
+** Deploying (publishing to server) with scripts
+
+If called with a prefix argument (C-u) the commands =org-pm-publish-file=, =org-pm-publish-subtree=, =org-pm-republish-entire-project= will look for a shell script to run after the publish process is complete. If you want to run a script to upload the project's site with =git= or =rsync= etc, then place that script in directory =DEPLOY= inside the directory of the project.  The script's file name must end in =.sh=.  Only the first script file contained in the =DEPLOY= directory will be run.  Other files are ignored.
