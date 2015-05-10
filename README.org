@@ -81,3 +81,22 @@ To add your own templates, create a folder where you will put the templates, and
 ** Deploying (publishing to server) with scripts
 
 If called with a prefix argument (C-u) the commands =org-pm-publish-file=, =org-pm-publish-subtree=, =org-pm-republish-entire-project= will look for a shell script to run after the publish process is complete. If you want to run a script to upload the project's site with =git= or =rsync= etc, then place that script in directory =DEPLOY= inside the directory of the project.  The script's file name must end in =.sh=.  Only the first script file contained in the =DEPLOY= directory will be run.  Other files are ignored.
+
+The path of the project folder is passed to the script as first argument.
+
+Here is an example script for deploying to github:
+
+(file:~/org-pm-projects/project1/DEPLOY/github.sh)
+
+#+BEGIN_SRC sh
+#!/bin/bash
+cd $1
+git checkout master
+git add .
+git commit -am "Published on: `date`"
+git push origin master
+git checkout gh-pages
+git merge master
+git push origin gh-pages
+git checkout master
+#+END_SRC
