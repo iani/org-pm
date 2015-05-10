@@ -1,9 +1,6 @@
 #+PM_PROJECTS: project1
-*THIS IS WORK IN PROGRESS*
 
-*PRE-ALPHA*
-
-* org-pm
+* org-pm (v. 0.1.0)
 
 Publish org-mode files or sections to projects created GB reading specifications from a folder.
 ** Features / Principles

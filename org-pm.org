@@ -349,13 +349,6 @@ Note: a reset:
         (if org-pm-last-chosen-project
             (list org-pm-last-chosen-project)
           nil))))
-
-  ;; (or
-  ;;  (car (memq org-pm-last-chosen-project projects))
-  ;;  (car projects))
-
-
-
 #+END_SRC
 * User interface (commands, menu, keybindings)
 

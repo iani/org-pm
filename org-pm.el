@@ -303,10 +303,6 @@ Else list the last project that has been exported to."
           (list org-pm-last-chosen-project)
         nil))))
 
-;; (or
-;;  (car (memq org-pm-last-chosen-project projects))
-;;  (car projects))
-
 (defun org-pm-select-project-then-action ()
   (interactive)
   (let ((project (org-pm-choose-project))
