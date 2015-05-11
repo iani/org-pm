@@ -28,6 +28,26 @@ The =el-get= recipe for =org-pm= is:
 1. =grizzl=
 2. =dash=
 
+On Emacs 24 one can install these packages by running the command =package-install=  (Meta-x package-install grizzl).
+
+** Commands
+
+- org-pm-menu (Function-e m) :: Open a menu with following items:
+  - publish file
+  - publish subtree
+  - dired root directory
+  - dired source directory
+  - dired target directory
+  - republish entire project
+  - open last published file
+  - make project
+- org-pm-publish-file (Function-e f) :: Publish the current file to a project selected from a menu of existing project, or enter a name to create a new project.
+- org-pm-publish-subtree (Function-e s) :: Publish the current org-section to a project selected from menu (see =org-pm-publish-file=).
+- org-pm-republish-entire-project :: Force re-publishing all source files of the project.
+- org-pm-make-project :: Create a new project or select a new template for an existing project.
+
+When the above publishing commands are preceded by a universal argument (Control-U), =org-pm= will execute the first shell file (=.sh=) found inside sub-directory =DEPLOY= of the project after publishing.  This can be used to upload the site to a server immediately after exporting it.
+
 ** Directory structure
 *** Project directory
 
