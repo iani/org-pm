@@ -1,3 +1,5 @@
+#+LATEX_TEMPLATE_COPY: /Users/iani/Documents/Dev/Emacs/org-pm/attachments/README/latex-simple-article-english-hypatia.tex
+#+LATEX_TEMPLATE: /Users/iani/Copy/000WORKFILES/1_SNIPPETS_AND_TEMPLATES/latex-simple-article-english-hypatia.tex
 #+PM_PROJECTS: project1
 
 * org-pm (v. 0.2.2)
