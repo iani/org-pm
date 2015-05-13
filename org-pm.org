@@ -297,7 +297,7 @@ Note: a reset:
 #+END_SRC
 
 
-* Publishing and Deploy Functions
+* Publish and Deploy Functions
 
 ** Publish - top level functions
 #+BEGIN_SRC emacs-lisp
@@ -404,7 +404,7 @@ Note: a reset:
   (defun org-pm-make-includes-headers (project-name)
     "Make HTML_HEAD_EXTRA lines with links for each css and js file in includes.
   For each js or css files in includes directory, construct a HTML_HEAD_EXTRA
-  string and to add it to the top of the org source file for publishing."
+  string and add it to the top of the org source file for publishing."
     (let* ((subdir
             (concat
              org-pm-target-subdir
@@ -590,7 +590,7 @@ Note: a reset:
     (org-pm-compose-project-attribute-name project "subdirectory"))
 #+END_SRC
 
-** Get a projects attributes
+** Get a project's attributes
 #+BEGIN_SRC emacs-lisp
   ;; The source file name is stored in property _<project-name>-filename
   ;; The subdirectory is stored in property _<project-name>-subdirectory
