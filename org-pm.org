@@ -17,7 +17,7 @@
 :PM_PROJECTS: testing-1-2-3
 :END:
 
-** directory + file paths, variables and construction functions
+** directory + file paths, variables and path construction functions
 
 Note: a reset:
 #+BEGIN_SRC elisp
@@ -226,8 +226,7 @@ Note: a reset:
     (interactive "P")
     (org-pm-publish (or project (org-pm-choose-project)) deploy-p t))
 #+END_SRC
-* User interaction help functions
-
+* User interaction auxiliary functions
 #+BEGIN_SRC emacs-lisp
   (defun org-pm-choose-project (&optional subtree-p)
     "Choose a project from menu.
@@ -280,12 +279,27 @@ Note: a reset:
     (mapcar
      (lambda (p) (file-name-nondirectory (file-name-sans-extension p)))
      (file-expand-wildcards (concat org-pm-root-dir "/*"))))
+
+  ;;; INCOMPLETE!:
+  (defun org-pm-default-project-list (&optional subtree-p)
+    "Present list of default projects for user to choose from.
+  If current buffer is in org-mode, then list projects that this file or subtree
+  has already been exported in.
+  Else list the last project that has been exported to."
+    (let ((exported-projects
+           ))
+      (if exported-projects
+          exported-projects
+        (if org-pm-last-chosen-project
+            (list org-pm-last-chosen-project)
+          nil))))
+
 #+END_SRC
 
 
-* Publishing Functions
+* Publishing and Deploy Functions
 
-** Publishing functions
+** Publish - top level functions
 #+BEGIN_SRC emacs-lisp
   (defun org-pm-publish-file-or-subtree (deploy-p project &optional subtree-p)
     "Publish current file or subtree to a project chosen from template folder."
@@ -325,20 +339,6 @@ Note: a reset:
       (save-buffer)
       (kill-buffer)
       (setq org-pm-last-saved-source-path source-file-path)))
-
-  ;;; INCOMPLETE!:
-  (defun org-pm-default-project-list (&optional subtree-p)
-    "Present list of default projects for user to choose from.
-  If current buffer is in org-mode, then list projects that this file or subtree
-  has already been exported in.
-  Else list the last project that has been exported to."
-    (let ((exported-projects
-           ))
-      (if exported-projects
-          exported-projects
-        (if org-pm-last-chosen-project
-            (list org-pm-last-chosen-project)
-          nil))))
 
   ;;; Main function
 
@@ -383,16 +383,11 @@ Note: a reset:
                   :publishing-directory)))))))
       the-list))
 
-  (defun org-pm-deploy (publishing-directory)
-    (let ((script
-           (car (file-expand-wildcards
-                 (concat publishing-directory "/DEPLOY/*.sh")))))
-      (when script
-        (message "Deploying project to site with script:\n%s\n" script)
-        (start-process "deploy" "*deploy*" script publishing-directory)
-        (message
-         "Deployed project to site with script:\n%s\n=====COMPLETED!======\n"
-         script))))
+#+END_SRC
+
+** Headers and options
+
+#+BEGIN_SRC emacs-lisp
 
   (defun org-pm-insert-headers (backend)
     "Insert org-publish headers to current buffer before publishing.
@@ -476,6 +471,21 @@ Note: a reset:
         "")))
 #+END_SRC
 
+** Deploy
+
+#+BEGIN_SRC emacs-lisp
+
+(defun org-pm-deploy (publishing-directory)
+  (let ((script
+         (car (file-expand-wildcards
+               (concat publishing-directory "/DEPLOY/*.sh")))))
+    (when script
+      (message "Deploying project to site with script:\n%s\n" script)
+      (start-process "deploy" "*deploy*" script publishing-directory)
+      (message
+       "Deployed project to site with script:\n%s\n=====COMPLETED!======\n"
+       script))))
+#+END_SRC
 * Store and retrieve export info in origin buffer
 ** Obtain paths for exporting source
 
