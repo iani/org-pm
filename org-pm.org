@@ -229,69 +229,73 @@ Note: a reset:
 * User interaction help functions
 
 #+BEGIN_SRC emacs-lisp
-(defun org-pm-choose-project (&optional subtree-p)
-  "Choose a project from menu.
-- Present vertical menu with grizzl.
-- If no project exists, then create one.
-- If name of project entered is not in list of exising projects, then create
-  that project.
-- Offer last chosen project for file or section in current org-mode buffer
-  as default.
-- Append list already exported projects for file or section, distinguishing it
-through a separator line."
-  (let* ((existing-projects
-          (reverse (append '("====== Existing projects: ======") (org-pm-list-projects))))
-         (default-projects
-          (if (eq (buffer-local-value 'major-mode (current-buffer)) 'org-mode)
-              (if subtree-p
-                  (org-pm-get-subtree-projects)
-                (org-pm-get-file-projects))
-            nil))
-         (default-project-menu
-           (if default-projects
+  (defun org-pm-choose-project (&optional subtree-p)
+    "Choose a project from menu.
+  - Present vertical menu with grizzl.
+  - If no project exists, then create one.
+  - If name of project entered is not in list of exising projects, then create
+    that project.
+  - Offer last chosen project for file or section in current org-mode buffer
+    as default.
+  - Append list already exported projects for file or section, distinguishing it
+  through a separator line."
+    (let* ((existing-projects
+            (reverse (append '("====== Existing projects: ======") (org-pm-list-projects))))
+           (default-projects
+            (if (eq (buffer-local-value 'major-mode (current-buffer)) 'org-mode)
+                (if subtree-p
+                    (org-pm-get-subtree-projects)
+                  (org-pm-get-file-projects))
+              nil))
+           (default-project-menu
+             (if default-projects
+                 (reverse
+                  (cons
+                   (format
+                    "====== Projects which current %s already exports to are: ======"
+                    (if subtree-p "section" "file"))
+                   default-projects))
+               (reverse (cons "====== Default project: ======="
+                              (list (or org-pm-last-chosen-project "project1"))))))
+           (chosen-project
+            (replace-regexp-in-string
+             "[^[:alnum:]]+"
+             "-"
+             (grizzl-completing-read
+              "=== CHOOSE EXISTING PROJECT, OR ENTER NAME TO CREATE ONE ==="
+              (grizzl-make-index
                (reverse
-                (cons
-                 (format
-                  "====== Projects which current %s already exports to are: ======"
-                  (if subtree-p "section" "file"))
-                 default-projects))
-             (reverse (cons "====== Default project: ======="
-                            (list (or org-pm-last-chosen-project "project1"))))))
-         (chosen-project
-          (replace-regexp-in-string
-           "[^[:alnum:]]+"
-           "-"
-           (grizzl-completing-read
-            "=== CHOOSE EXISTING PROJECT, OR ENTER NAME TO CREATE ONE ==="
-            (grizzl-make-index
-             (reverse
-              (delete-dups
-               (append default-project-menu existing-projects)))))))
-         (project-path (org-pm-get-project-dir chosen-project)))
-    (unless (file-exists-p project-path)
-      (if (y-or-n-p (format "Really create project named '%s'?" chosen-project))
-          (mkdir project-path t)
-        (error
-         (format "Did not create project %s. Publishing cancelled."
-                 chosen-project))))
-    chosen-project))
+                (delete-dups
+                 (append default-project-menu existing-projects)))))))
+           (project-path (org-pm-get-project-dir chosen-project)))
+      (unless (file-exists-p project-path)
+        (if (y-or-n-p (format "Really create project named '%s'?" chosen-project))
+            (mkdir project-path t)
+          (error
+           (format "Did not create project %s. Publishing cancelled."
+                   chosen-project))))
+      chosen-project))
+
+  (defun org-pm-list-projects ()
+    (mapcar
+     (lambda (p) (file-name-nondirectory (file-name-sans-extension p)))
+     (file-expand-wildcards (concat org-pm-root-dir "/*"))))
 #+END_SRC
 
 
 * Publishing Functions
-
 
 ** Publishing functions
 #+BEGIN_SRC emacs-lisp
   (defun org-pm-publish-file-or-subtree (deploy-p project &optional subtree-p)
     "Publish current file or subtree to a project chosen from template folder."
     (when project
-      (org-add-option-or-property
-       org-pm-registered-projects-property project subtree-p)
       (org-pm-save-org-source project subtree-p)
       (org-pm-publish project deploy-p nil)))
 
   (defun org-pm-save-org-source (project-name subtree-p)
+    (org-add-option-or-property
+     org-pm-registered-projects-property project-name subtree-p)
     (save-buffer)
     (let* ((contents-buffer (current-buffer))
            (contents-path (or (buffer-file-name) (buffer-name)))
@@ -315,7 +319,7 @@ through a separator line."
                   (org-pm-compose-project-attribute-name
                    project-name org-pm-subdir-property-name))
                  (subdir (org-entry-get (point) pname)))
-            (if subdir (insert "#+" pname " " subdir "\n"))
+            (if subdir (insert "#+" pname " " subdir "\n")) ;; TODO: review this
             (org-paste-subtree 1))
         (insert-buffer-substring contents-buffer))
       (save-buffer)
@@ -335,14 +339,7 @@ through a separator line."
         (if org-pm-last-chosen-project
             (list org-pm-last-chosen-project)
           nil))))
-#+END_SRC
-** Publishing functions 2 (main!)
-:PROPERTIES:
-:ID:       777717F0-B63A-429B-B731-BFB77A885539
-:eval-id:  2
-:PM_PROJECTS: testing-1-2-3
-:END:
-#+BEGIN_SRC emacs-lisp
+
   ;;; Main function
 
   (defun org-pm-publish (project deploy-p force)
@@ -351,11 +348,6 @@ through a separator line."
           (org-export-before-parsing-hook '(org-pm-insert-headers))
           (project-name project))
       (org-publish project force)))
-
-  (defun org-pm-list-projects ()
-    (mapcar
-     (lambda (p) (file-name-nondirectory (file-name-sans-extension p)))
-     (file-expand-wildcards (concat org-pm-root-dir "/*"))))
 
   (defun org-pm-create-project-plist (project-name deploy-p)
     "Create org-publish-project-alist with project from template folder.
@@ -632,11 +624,9 @@ through a separator line."
     (-select (lambda (x) (> (length x) 0))
              (split-string
               (or (org-entry-get (point) org-pm-registered-projects-property) "") " ")))
-
-
 #+END_SRC
 
-** Utilities: Access org properties and headlines
+** Access org properties and headlines
 #+BEGIN_SRC emacs-lisp
   (defun org-pm-get-subtree-headline () (nth 4 (org-heading-components)))
 
