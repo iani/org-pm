@@ -257,16 +257,19 @@ Note: a reset:
                (reverse (cons "====== Default project: ======="
                               (list (or org-pm-last-chosen-project "project1"))))))
            (chosen-project
-            (replace-regexp-in-string
-             "[^[:alnum:]]+"
-             "-"
+            (strip-nonalpha
              (grizzl-completing-read
-              "=== CHOOSE EXISTING PROJECT, OR ENTER NAME TO CREATE ONE ==="
+              "=== CHOOSE EXISTING PROJECT ==="
               (grizzl-make-index
                (reverse
                 (delete-dups
-                 (append default-project-menu existing-projects)))))))
+                 (append '("NEW PROJECT") default-project-menu existing-projects)))))))
            (project-path (org-pm-get-project-dir chosen-project)))
+      (if (equal chosen-project "NEW-PROJECT")
+          (setq chosen-project
+                (strip-nonalpha
+                 (read-from-minibuffer
+                  "Enter name of new project:" "my-new-project"))))
       (unless (file-exists-p project-path)
         (if (y-or-n-p (format "Really create project named '%s'?" chosen-project))
             (mkdir project-path t)
@@ -518,7 +521,7 @@ Note: a reset:
                (file-name-sans-extension
                 (org-pm-make-source-file-name project-name subtree-p))))))
            (dir (org-pm-get-source-file-dir project-name subtree-p)))
-      (org-pm-add-option-or-property
+      (org-add-option-or-property
        ;; TODO: construct option name here!
        filename
        subtree-p)

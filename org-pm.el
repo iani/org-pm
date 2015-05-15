@@ -76,62 +76,6 @@ Create directory if needed."
 (defvar org-pm-last-saved-source-path ""
   "org-pm-last-exported-file-path is computed from this variable.")
 
-(defun org-pm-get-source-file-path (project-name subtree-p)
-  (concat
-   (org-pm-get-source-file-dir project-name subtree-p)
-   "/"
-   (org-pm-make-source-file-name project-name subtree-p)))
-
-(defun org-pm-query-source-file-path (project-name subtree-p)
-  ;; TODO: when queried path is different from default, then save it in property
-  (concat
-   (org-pm-get-source-file-dir project-name subtree-p)
-   "/"
-   (replace-regexp-in-string
-    "[^[:alnum:]]+" "-"
-    (read-from-minibuffer
-     (format "Save %s as: " (if subtree-p "section" "file"))
-     (file-name-sans-extension
-      (org-pm-make-source-file-name project-name subtree-p))))
-   ".org"))
-
-(defun org-pm-get-source-file-dir (project-name subtree-p)
-  (let* ((maindir (org-pm-get-source-dir project-name))
-         (subdir (org-pm-get-subdir project-name subtree-p))
-         (full-dir (if subdir (concat maindir "/" subdir) maindir)))
-    (unless (file-exists-p full-dir) (mkdir full-dir t))
-    full-dir))
-
-(defun org-pm-get-subdir (project-name subtree-p)
-  (org-pm-get-project-attribute
-   project-name org-pm-subdir-property-name subtree-p))
-
-(defun org-pm-make-source-file-name (project-name subtree-p)
-  (or (org-pm-get-project-attribute project-name "filename" subtree-p)
-      (if subtree-p
-           (concat
-            (replace-regexp-in-string
-             "[^[:alnum:]]+" "-" (org-pm-get-subtree-headline))
-            ".org")
-        (file-name-nondirectory (buffer-file-name)))))
-
-(defun org-pm-get-target-file-path (project-name subtree-p &optional file-type)
-  "Get full path where file/subtree will be exported.
-Used to open that file for viewing (on browser etc)."
-  (concat
-   (org-pm-get-target-file-dir project-name subtree-p)
-   (concat
-    (file-name-sans-extension
-     (org-pm-make-source-file-name project-name subtree-p))
-    (and file-type ".html"))))
-
-(defun org-pm-get-target-file-dir (project-name subtree-p)
-  (let* ((maindir (org-pm-get-target-dir project-name))
-         (subdir (org-pm-get-subdir project-name subtree-p))
-         (full-dir (if subdir (concat maindir "/" subdir) maindir)))
-    (unless (file-exists-p full-dir) (mkdir full-dir t))
-    full-dir))
-
 (global-set-key (kbd "H-e m") 'org-pm-menu)
 (global-set-key (kbd "<f14> m") 'org-pm-menu)
 (global-set-key (kbd "<f14> <f14>") 'org-pm-menu)
@@ -169,92 +113,6 @@ Used to open that file for viewing (on browser etc)."
   (interactive "P")
   (org-pm-publish-file-or-subtree deploy-p (or project (org-pm-choose-project t)) t))
 
-(defun org-pm-publish-file-or-subtree (deploy-p project &optional subtree-p)
-  "Publish current file or subtree to a project chosen from template folder."
-  (when project
-    (org-add-option-or-property
-     org-pm-registered-projects-property project subtree-p)
-    (org-pm-save-org-source project subtree-p)
-    (org-pm-publish project deploy-p nil)))
-
-(defun org-pm-save-org-source (project-name subtree-p)
-  (save-buffer)
-  (let* ((contents-buffer (current-buffer))
-         (contents-path (or (buffer-file-name) (buffer-name)))
-         (source-file-path (org-pm-query-source-file-path project-name subtree-p))
-         (source-file-dir (file-name-directory source-file-path)))
-    (if subtree-p (org-copy-subtree))
-    (unless (file-exists-p source-file-dir) (mkdir source-file-dir t))
-    (find-file source-file-path)
-    (erase-buffer)
-    (insert "#+EXPORT_DATE: "
-            (format-time-string "%A %d %B %Y %T %Z\n")
-            "#+SOURCE: "
-            contents-path
-            "\n")
-    ;; If excerpting from subtree, then
-    ;; subfolder must be stored in file now, to be used later
-    ;; by org-export-before-parsing hook function org-pm-insert-headers
-    ;; (if wnole-file, then any subdir spec will already be in place).
-    (if subtree-p
-        (let* ((pname
-                (org-pm-compose-project-attribute-name
-                 project-name org-pm-subdir-property-name))
-               (subdir (org-entry-get (point) pname)))
-          (if subdir (insert "#+" pname " " subdir "\n"))
-          (org-paste-subtree 1))
-      (insert-buffer-substring contents-buffer))
-    (save-buffer)
-    (kill-buffer)
-    (setq org-pm-last-saved-source-path source-file-path)))
-
-(defun org-pm-choose-project (&optional subtree-p)
-  "Choose a project from menu.
-- Present vertical menu with grizzl.
-- If no project exists, then create one.
-- If name of project entered is not in list of exising projects, then create
-  that project.
-- Offer last chosen project for file or section in current org-mode buffer
-  as default.
-- Append list already exported projects for file or section, distinguishing it
-through a separator line."
-  (let* ((existing-projects
-          (reverse (append '("====== Existing projects: ======") (org-pm-list-projects))))
-         (default-projects
-          (if (eq (buffer-local-value 'major-mode (current-buffer)) 'org-mode)
-              (if subtree-p
-                  (org-pm-get-subtree-projects)
-                (org-pm-get-file-projects))
-            nil))
-         (default-project-menu
-           (if default-projects
-               (reverse
-                (cons
-                 (format
-                  "====== Projects which current %s already exports to are: ======"
-                  (if subtree-p "section" "file"))
-                 default-projects))
-             (reverse (cons "====== Default project: ======="
-                            (list (or org-pm-last-chosen-project "project1"))))))
-         (chosen-project
-          (replace-regexp-in-string
-           "[^[:alnum:]]+"
-           "-"
-           (grizzl-completing-read
-            "=== CHOOSE EXISTING PROJECT, OR ENTER NAME TO CREATE ONE ==="
-            (grizzl-make-index
-             (reverse
-              (delete-dups
-               (append default-project-menu existing-projects)))))))
-         (project-path (org-pm-get-project-dir chosen-project)))
-    (unless (file-exists-p project-path)
-      (if (y-or-n-p (format "Really create project named '%s'?" chosen-project))
-          (mkdir project-path t)
-        (error
-         (format "Did not create project %s. Publishing cancelled."
-                 chosen-project))))
-    chosen-project))
-
 (defun org-pm-make-project (&optional project-name)
   (interactive)
   (unless project-name
@@ -289,58 +147,6 @@ through a separator line."
           (message (format "Updated template for project %s" project-name)))
        (error (format "Template not found: %s" template-dir)))))
 
-;;; INCOMPLETE!:
-(defun org-pm-default-project-list (&optional subtree-p)
-  "Present list of default projects for user to choose from.
-If current buffer is in org-mode, then list projects that this file or subtree
-has already been exported in.
-Else list the last project that has been exported to."
-  (let ((exported-projects
-         ))
-    (if exported-projects
-        exported-projects
-      (if org-pm-last-chosen-project
-          (list org-pm-last-chosen-project)
-        nil))))
-
-(defun org-pm-select-project-then-action ()
-  (interactive)
-  (let ((project (org-pm-choose-project))
-        (action (org-pm-select-action)))
-    (funcall action project)))
-
-(defun org-pm-select-action-then-project ()
-  "Project selection is provided by the action, if needed."
-  (interactive)
-  (funcall (org-pm-select-action)))
-
-(global-set-key (kbd "H-m") 'org-pm-select-action-then-project)
-(global-set-key (kbd "H-M") 'org-pm-select-project-then-action)
-
-(defun org-pm-select-action ()
-  (intern
-   (concat
-    "org-pm-"
-    (replace-regexp-in-string
-     " " "-"
-     (grizzl-completing-read
-      " === SELECT ACTION: === "
-      (grizzl-make-index
-       '("make project"
-         "dired root directory"
-         "dired source directory"
-         "dired target directory"
-         "publish subtree"
-         "publish file"
-         "republish entire project"
-         "open last published file")))))))
-
-
-(defun org-pm-republish-entire-project (&optional deploy-p project)
-  "Republish entire source of PROJECT."
-  (interactive "P")
-  (org-pm-publish (or project (org-pm-choose-project)) deploy-p t))
-
 (defun org-pm-dired-root-directory (&optional dummy)
   (interactive)
   (dired org-pm-root-dir))
@@ -360,6 +166,119 @@ Else list the last project that has been exported to."
         (shell-command (concat "open " path))
       (message "No file found to open: %s" path))))
 
+(defun org-pm-republish-entire-project (&optional deploy-p project)
+  "Republish entire source of PROJECT."
+  (interactive "P")
+  (org-pm-publish (or project (org-pm-choose-project)) deploy-p t))
+
+(defun org-pm-choose-project (&optional subtree-p)
+  "Choose a project from menu.
+- Present vertical menu with grizzl.
+- If no project exists, then create one.
+- If name of project entered is not in list of exising projects, then create
+  that project.
+- Offer last chosen project for file or section in current org-mode buffer
+  as default.
+- Append list already exported projects for file or section, distinguishing it
+through a separator line."
+  (let* ((existing-projects
+          (reverse (append '("====== Existing projects: ======") (org-pm-list-projects))))
+         (default-projects
+          (if (eq (buffer-local-value 'major-mode (current-buffer)) 'org-mode)
+              (if subtree-p
+                  (org-pm-get-subtree-projects)
+                (org-pm-get-file-projects))
+            nil))
+         (default-project-menu
+           (if default-projects
+               (reverse
+                (cons
+                 (format
+                  "====== Projects which current %s already exports to are: ======"
+                  (if subtree-p "section" "file"))
+                 default-projects))
+             (reverse (cons "====== Default project: ======="
+                            (list (or org-pm-last-chosen-project "project1"))))))
+         (chosen-project
+          (strip-nonalpha
+           (grizzl-completing-read
+            "=== CHOOSE EXISTING PROJECT ==="
+            (grizzl-make-index
+             (reverse
+              (delete-dups
+               (append '("NEW PROJECT") default-project-menu existing-projects)))))))
+         (project-path (org-pm-get-project-dir chosen-project)))
+    (if (equal chosen-project "NEW-PROJECT")
+        (setq chosen-project
+              (strip-nonalpha
+               (read-from-minibuffer
+                "Enter name of new project:" "my-new-project"))))
+    (unless (file-exists-p project-path)
+      (if (y-or-n-p (format "Really create project named '%s'?" chosen-project))
+          (mkdir project-path t)
+        (error
+         (format "Did not create project %s. Publishing cancelled."
+                 chosen-project))))
+    chosen-project))
+
+(defun org-pm-list-projects ()
+  (mapcar
+   (lambda (p) (file-name-nondirectory (file-name-sans-extension p)))
+   (file-expand-wildcards (concat org-pm-root-dir "/*"))))
+
+;;; INCOMPLETE!:
+(defun org-pm-default-project-list (&optional subtree-p)
+  "Present list of default projects for user to choose from.
+If current buffer is in org-mode, then list projects that this file or subtree
+has already been exported in.
+Else list the last project that has been exported to."
+  (let ((exported-projects
+         ))
+    (if exported-projects
+        exported-projects
+      (if org-pm-last-chosen-project
+          (list org-pm-last-chosen-project)
+        nil))))
+
+(defun org-pm-publish-file-or-subtree (deploy-p project &optional subtree-p)
+  "Publish current file or subtree to a project chosen from template folder."
+  (when project
+    (org-pm-save-org-source project subtree-p)
+    (org-pm-publish project deploy-p nil)))
+
+(defun org-pm-save-org-source (project-name subtree-p)
+  (org-add-option-or-property
+   org-pm-registered-projects-property project-name subtree-p)
+  (save-buffer)
+  (let* ((contents-buffer (current-buffer))
+         (contents-path (or (buffer-file-name) (buffer-name)))
+         (source-file-path (org-pm-query-source-file-path project-name subtree-p))
+         (source-file-dir (file-name-directory source-file-path)))
+    (if subtree-p (org-copy-subtree))
+    (unless (file-exists-p source-file-dir) (mkdir source-file-dir t))
+    (find-file source-file-path)
+    (erase-buffer)
+    (insert "#+EXPORT_DATE: "
+            (format-time-string "%A %d %B %Y %T %Z\n")
+            "#+SOURCE: "
+            contents-path
+            "\n")
+    ;; If excerpting from subtree, then
+    ;; subfolder must be stored in file now, to be used later
+    ;; by org-export-before-parsing hook function org-pm-insert-headers
+    ;; (if wnole-file, then any subdir spec will already be in place).
+    (if subtree-p
+        (let* ((pname
+                (org-pm-compose-project-attribute-name
+                 project-name org-pm-subdir-property-name))
+               (subdir (org-entry-get (point) pname)))
+          (if subdir (insert "#+" pname " " subdir "\n")) ;; TODO: review this
+          (org-paste-subtree 1))
+      (insert-buffer-substring contents-buffer))
+    (save-buffer)
+    (kill-buffer)
+    (setq org-pm-last-saved-source-path source-file-path)))
+
 ;;; Main function
 
 (defun org-pm-publish (project deploy-p force)
@@ -368,11 +287,6 @@ Else list the last project that has been exported to."
         (org-export-before-parsing-hook '(org-pm-insert-headers))
         (project-name project))
     (org-publish project force)))
-
-(defun org-pm-list-projects ()
-  (mapcar
-   (lambda (p) (file-name-nondirectory (file-name-sans-extension p)))
-   (file-expand-wildcards (concat org-pm-root-dir "/*"))))
 
 (defun org-pm-create-project-plist (project-name deploy-p)
   "Create org-publish-project-alist with project from template folder.
@@ -408,19 +322,6 @@ that contains the project."
                 :publishing-directory)))))))
     the-list))
 
-(defun org-pm-deploy (publishing-directory)
-  ;; (message "must do my stuff here !!!!!!! %s" publishing-directory)
-  (let ((script
-         (car (file-expand-wildcards
-               (concat publishing-directory "/DEPLOY/*.sh")))))
-    (when script
-      (message "Deploying project to site with script:\n%s\n" script)
-      (start-process "deploy" "*deploy*" script publishing-directory)
-      (message
-       "Deploying project to site with script:\n%s\n=====COMPLETED!======\n"
-       script)))
-  )
-
 (defun org-pm-insert-headers (backend)
   "Insert org-publish headers to current buffer before publishing.
 
@@ -436,7 +337,7 @@ of project folder corresponding to PROJECT_NAME."
 (defun org-pm-make-includes-headers (project-name)
   "Make HTML_HEAD_EXTRA lines with links for each css and js file in includes.
 For each js or css files in includes directory, construct a HTML_HEAD_EXTRA
-string and to be add it to the top of the org source file for publishing."
+string and add it to the top of the org source file for publishing."
   (let* ((subdir
           (concat
            org-pm-target-subdir
@@ -502,7 +403,133 @@ string and to be add it to the top of the org source file for publishing."
           (concat (buffer-string) "\n"))
       "")))
 
-(defun org-pm-get-subtree-headline () (nth 4 (org-heading-components)))
+(defun org-pm-deploy (publishing-directory)
+  (let ((script
+         (car (file-expand-wildcards
+               (concat publishing-directory "/DEPLOY/*.sh")))))
+    (when script
+      (message "Deploying project to site with script:\n%s\n" script)
+      (start-process "deploy" "*deploy*" script publishing-directory)
+      (message
+       "Deployed project to site with script:\n%s\n=====COMPLETED!======\n"
+       script))))
+
+(defun org-pm-get-source-file-path (project-name subtree-p)
+  "Create path for saving file or subtree to SOURCE dir for export.
+  1. Get source file directory based on project name.  Use subfolder
+     if that is specified as property for that project in file or subtree.
+
+  2. Get source file name for this project and file or subtree. For this:
+     Ask the user to for a file name.
+     As default, provide the file name stored for this project in
+     this file's or subtree's properties, or if the corresponding property
+     is not set, then create a default from the name of the file or section.
+
+  3. Concatenate directory and file name.
+  "
+  (concat
+   (org-pm-get-source-file-dir project-name subtree-p)
+   "/"
+   (org-pm-make-source-file-name project-name subtree-p)))
+
+(defun org-pm-query-source-file-path (project-name subtree-p)
+  ;; TODO: Save new path in property
+  (let* ((filename
+          (file-name-sans-extension
+           (strip-nonalpha
+            (read-from-minibuffer
+             (format "Save %s as: " (if subtree-p "section" "file"))
+             (file-name-sans-extension
+              (org-pm-make-source-file-name project-name subtree-p))))))
+         (dir (org-pm-get-source-file-dir project-name subtree-p)))
+    (org-add-option-or-property
+     ;; TODO: construct option name here!
+     filename
+     subtree-p)
+    (concat dir "/" filename ".org")))
+
+(defun strip-nonalpha (input-string)
+  (replace-regexp-in-string "[^[:alnum:]]+" "-" input-string))
+
+(defun org-pm-get-source-file-dir (project-name subtree-p)
+  "Get the directory to store this file or subtree for export.
+  Compute MAINDIR from the root project directory + PROJECT-NAME.
+  If a subdirectory property is set for this project and this file
+  or subtree, then add it to MAINDIR."
+  (let* ((maindir (org-pm-get-source-dir project-name))
+         (subdir (org-pm-get-subdir project-name subtree-p))
+         (full-dir (if subdir (concat maindir "/" subdir) maindir)))
+    (unless (file-exists-p full-dir) (mkdir full-dir t))
+    full-dir))
+
+(defun org-pm-get-subdir (project-name subtree-p)
+  "Return subdirectory string if present as property for this project."
+  (org-pm-get-project-attribute
+   project-name org-pm-subdir-property-name subtree-p))
+
+(defun org-pm-make-source-file-name (project-name subtree-p)
+  "Return string for saving this file or subtree.
+  If corresponding property of file or subtree has a value, return it.
+  Otherwise construct string from file name or subtree heading."
+  (replace-regexp-in-string
+   "[^[:alnum:]]+" "-"
+   (or (org-pm-get-project-attribute project-name "filename" subtree-p)
+       (if subtree-p
+           (concat
+            (replace-regexp-in-string
+             "[^[:alnum:]]+" "-" (org-pm-get-subtree-headline))
+            ".org")
+         (file-name-nondirectory (buffer-file-name))))))
+
+(defun org-pm-get-target-file-path (project-name subtree-p &optional file-type)
+  "Get full path where file/subtree will be exported.
+  Used to open that file for viewing (on browser etc)."
+  (concat
+   (org-pm-get-target-file-dir project-name subtree-p)
+   (concat
+    (file-name-sans-extension
+     (org-pm-make-source-file-name project-name subtree-p))
+    (and file-type ".html"))))
+
+(defun org-pm-get-target-file-dir (project-name subtree-p)
+  (let* ((maindir (org-pm-get-target-dir project-name))
+         (subdir (org-pm-get-subdir project-name subtree-p))
+         (full-dir (if subdir (concat maindir "/" subdir) maindir)))
+    (unless (file-exists-p full-dir) (mkdir full-dir t))
+
+    ))
+
+(defun org-pm-compose-project-attribute-name (project-name property)
+  "Compose property or option name from PROJECT-NAME and PROPERTY."
+  (concat "_" project-name "-" property))
+
+(defun org-pm-make-filename-property-name (project)
+  (org-pm-compose-project-attribute-name project "filename"))
+
+(defun org-pm-make-subdirectory-property-name (project)
+  (org-pm-compose-project-attribute-name project "subdirectory"))
+
+;; The source file name is stored in property _<project-name>-filename
+;; The subdirectory is stored in property _<project-name>-subdirectory
+
+(defun org-pm-get-project-attribute (project-name property &optional subtree-p)
+  (let ((property-name
+         (org-pm-compose-project-attribute-name project-name property)))
+    (if subtree-p
+        (org-entry-get (point) property-name)
+      (org-get-option property-name))))
+
+(defun org-pm-store-source-filename (project-name filename subtree-p)
+  (org-add-option-or-property
+   (org-pm-make-filename-property-name project-name)
+   filename
+   subtree-p))
+
+(defun org-pm-store-source-subdirectory (project-name subdir subtree-p)
+  (org-add-option-or-property
+   (org-pm-make-subdirectory-property-name project-name)
+   subdir
+   subtree-p))
 
 (defun org-pm-get-file-and-subtree-projects ()
   (delete-dups
@@ -518,22 +545,7 @@ string and to be add it to the top of the org source file for publishing."
            (split-string
             (or (org-entry-get (point) org-pm-registered-projects-property) "") " ")))
 
-(defun org-pm-get-project-attribute (project-name property &optional subtree-p)
-  (let ((property-name ;; use function for DRY when setting/getting
-         (org-pm-compose-project-attribute-name project-name property)))
-   (if subtree-p
-       (org-entry-get (point) property-name)
-     (org-get-option property-name))))
-
-(defun org-pm-compose-project-attribute-name (project-name property)
-  "Compose property or option name from PROJECT-NAME and PROPERTY.
-The code of this function is shorter than its name, but this function
-ensures that the attrubute name is always constructed in the same way."
-  (concat "_" project-name "-" property))
-
-(defun org-pm-make-subdir-option (project-name)
-  (org-pm-compose-project-attribute-name
-   project-name org-pm-subdir-property-name))
+(defun org-pm-get-subtree-headline () (nth 4 (org-heading-components)))
 
 (defun org-get-option (option)
   (save-excursion
