@@ -22,9 +22,12 @@ To un-hide any section and display it in a fixed position (near the top of the p
 
 At the top of the org-mode document, insert the following code for the placeholder:
 
+#+BEGIN_EXAMPLE
 #+BEGIN_HTML
 <div id="currentSection"><div id="currentChild"></div></div>
 #+END_HTML
+#+END_EXAMPLE
+
 ** 2. Create a JavaScript function for cloning any section and showing it inside the placeholder =div=
 
 #+BEGIN_SRC js
