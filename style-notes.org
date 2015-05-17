@@ -45,11 +45,9 @@ Here are some buttons for testing the above technique.  A variant of this code s
 : <button type="button" onclick="cloneAppendVisible('outline-container-sec-1')">
 : replace child test 1
 : </button>
-:
 : <button type="button" onclick="cloneAppendVisible('outline-container-sec-2')">
 : replace child test 2
 : </button>
-:
 : <button type="button" onclick="cloneAppendVisible('outline-container-sec-1-1')">
 : show subsection test
 : </button>
