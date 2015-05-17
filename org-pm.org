@@ -230,22 +230,22 @@ Note: a reset:
 #+BEGIN_SRC emacs-lisp
   (defun org-pm-choose-project (&optional subtree-p)
     "Choose a project from menu.
-  - Present vertical menu with grizzl.
-  - If no project exists, then create one.
-  - If name of project entered is not in list of exising projects, then create
-    that project.
-  - Offer last chosen project for file or section in current org-mode buffer
-    as default.
-  - Append list already exported projects for file or section, distinguishing it
-  through a separator line."
+    - Present vertical menu with grizzl.
+    - If no project exists, then create one.
+    - If name of project entered is not in list of exising projects, then create
+      that project.
+    - Offer last chosen project for file or section in current org-mode buffer
+      as default.
+    - Append list already exported projects for file or section, distinguishing it
+    through a separator line."
     (let* ((existing-projects
             (reverse (append '("====== Existing projects: ======") (org-pm-list-projects))))
            (default-projects
-            (if (eq (buffer-local-value 'major-mode (current-buffer)) 'org-mode)
-                (if subtree-p
-                    (org-pm-get-subtree-projects)
-                  (org-pm-get-file-projects))
-              nil))
+             (if (eq (buffer-local-value 'major-mode (current-buffer)) 'org-mode)
+                 (if subtree-p
+                     (org-pm-get-subtree-projects)
+                   (org-pm-get-file-projects))
+               nil))
            (default-project-menu
              (if default-projects
                  (reverse
@@ -263,9 +263,10 @@ Note: a reset:
               (grizzl-make-index
                (reverse
                 (delete-dups
-                 (append '("NEW PROJECT") default-project-menu existing-projects)))))))
+                 (append '("CREATE NEW PROJECT")
+                         default-project-menu existing-projects)))))))
            (project-path (org-pm-get-project-dir chosen-project)))
-      (if (equal chosen-project "NEW-PROJECT")
+      (if (equal chosen-project "CREATE-NEW-PROJECT")
           (setq chosen-project
                 (strip-nonalpha
                  (read-from-minibuffer
@@ -283,12 +284,12 @@ Note: a reset:
      (lambda (p) (file-name-nondirectory (file-name-sans-extension p)))
      (file-expand-wildcards (concat org-pm-root-dir "/*"))))
 
-  ;;; INCOMPLETE!:
+    ;;; INCOMPLETE!:
   (defun org-pm-default-project-list (&optional subtree-p)
     "Present list of default projects for user to choose from.
-  If current buffer is in org-mode, then list projects that this file or subtree
-  has already been exported in.
-  Else list the last project that has been exported to."
+    If current buffer is in org-mode, then list projects that this file or subtree
+    has already been exported in.
+    Else list the last project that has been exported to."
     (let ((exported-projects
            ))
       (if exported-projects
@@ -550,13 +551,11 @@ Note: a reset:
     "Return string for saving this file or subtree.
     If corresponding property of file or subtree has a value, return it.
     Otherwise construct string from file name or subtree heading."
-    (replace-regexp-in-string
-     "[^[:alnum:]]+" "-"
+    (strip-nonalpha
      (or (org-pm-get-project-attribute project-name "filename" subtree-p)
          (if subtree-p
              (concat
-              (replace-regexp-in-string
-               "[^[:alnum:]]+" "-" (org-pm-get-subtree-headline))
+              (strip-nonalpha (org-pm-get-subtree-headline))
               ".org")
            (file-name-nondirectory (buffer-file-name))))))
 
