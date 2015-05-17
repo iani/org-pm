@@ -37,7 +37,7 @@ At the top of the org-mode document, insert the following code for the placehold
       newChild.style.display="block";
   }
 #+END_SRC
-** 3. Call the function for the showing of sections in the placeholder
+** 3. Call the function for showing sections in the placeholder
 
 Here are some buttons for testing the above technique.  A variant of this code should be integrated in the navigation menu.
 
