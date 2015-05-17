@@ -7,7 +7,8 @@ Two alternatives for going to a section when clicking its link on the contents m
 1. Scroll to the section.
 2. Show the section alone, while hiding all other contents on the main page.
 
-Alternative 2 is better for large files, especially if they also contain pictures which may slow down the loading of the page if they are all loaded at once.  Notes on how to implement showing one section only.
+Alternative 2 is better for large files, especially if they also contain pictures which may slow down the loading of the page if they are all loaded at once.  Following notes explain how to implement showing one section only.
+
 ** Hide all org-mode sections per default
 
 Upon loading the page, all sections should be hidden per default.  This is done in CSS by specifying =display: none= as property for style class =outline-2=:
@@ -55,7 +56,7 @@ Here are some buttons for testing the above technique.  A variant of this code s
 : </button>
 : #+END_HTML
 ** Initialize: Show the first section only when loading
-One may initialize the page to show only the first section when loading, by inserting the following code at the bottom of the org-mode file:
+The let the page show only the first section when loading, insert the following code at the bottom of the org-mode file:
 
 : #+BEGIN_HTML
 : <script>cloneAppendVisible("outline-container-sec-1")</script>
