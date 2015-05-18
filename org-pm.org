@@ -1,6 +1,8 @@
+#+_mmenu-test-filename: org-pm.org
+#+_project1-filename: index2.org
 #+LATEX_TEMPLATE_COPY: /Users/iani/Documents/Dev/Emacs/org-pm/attachments/org-pm/tufte-handout-fixed.tex
 #+LATEX_TEMPLATE: /Users/iani/Copy/000WORKFILES/1_SNIPPETS_AND_TEMPLATES/tufte-handout-fixed.tex
-#+PM_PROJECTS: project1 test-project1 testing-1-2-3 testing-4-5-6 testing-3-4-5
+#+PM_PROJECTS: mmenu-test project1 test-project1
 #+TITLE: ORG-PM
 #+OPTIONS: num:5 toc:3 H:5
 #+_test-project1-filename: index.org
@@ -110,10 +112,18 @@ Note: a reset:
 
 #+END_SRC
 
-** Source and target file paths
+** Mmenu.js option
 :PROPERTIES:
 :PM_PROJECTS: testing-1-2-3
 :END:
+
+#+BEGIN_SRC emacs-lisp
+  (defvar mmenu-p nil
+    "Optionally produce TOC in format compatible with mmenu.js
+  (http://mmenu.frebsite.nl/).
+  This is a first draft using a variable as switch.  To be improved...
+  See function: org-html-toc extended in org-pm.")
+#+END_SRC
 
 * Commands (User Interface)
 :PROPERTIES:
@@ -319,6 +329,8 @@ Note: a reset:
            (contents-path (or (buffer-file-name) (buffer-name)))
            (source-file-path (org-pm-query-source-file-path project-name subtree-p))
            (source-file-dir (file-name-directory source-file-path)))
+      (org-pm-store-source-filename
+       project-name (file-name-nondirectory source-file-path) subtree-p)
       (if subtree-p (org-copy-subtree))
       (unless (file-exists-p source-file-dir) (mkdir source-file-dir t))
       (find-file source-file-path)
@@ -412,7 +424,8 @@ Note: a reset:
     (let* ((subdir
             (concat
              org-pm-target-subdir
-             (or (org-get-option (org-pm-make-subdir-option project-name)) "")))
+             (or (org-get-option
+                  (org-pm-make-subdirectory-property-name project-name)) "")))
            (includes-path (org-pm-get-includes-dir project-name))
            (includes-string "")
            (relative-path "includes/"))
@@ -522,10 +535,8 @@ Note: a reset:
                (file-name-sans-extension
                 (org-pm-make-source-file-name project-name subtree-p))))))
            (dir (org-pm-get-source-file-dir project-name subtree-p)))
-      (org-add-option-or-property
-       ;; TODO: construct option name here!
-       filename
-       subtree-p)
+      ;; done by org-pm-save-org-source!:
+      ;; (org-pm-store-source-filename project-name filename subtree-p)
       (concat dir "/" filename ".org")))
 
   (defun strip-nonalpha (input-string)
@@ -552,12 +563,11 @@ Note: a reset:
     If corresponding property of file or subtree has a value, return it.
     Otherwise construct string from file name or subtree heading."
     (strip-nonalpha
-     (or (org-pm-get-project-attribute project-name "filename" subtree-p)
-         (if subtree-p
-             (concat
+     (file-name-sans-extension
+      (or (org-pm-get-project-attribute project-name "filename" subtree-p)
+          (if subtree-p
               (strip-nonalpha (org-pm-get-subtree-headline))
-              ".org")
-           (file-name-nondirectory (buffer-file-name))))))
+            (file-name-nondirectory (buffer-file-name)))))))
 
   (defun org-pm-get-target-file-path (project-name subtree-p &optional file-type)
     "Get full path where file/subtree will be exported.
@@ -608,13 +618,13 @@ Note: a reset:
 ** Store project filename and subdirectory
 #+BEGIN_SRC emacs-lisp
   (defun org-pm-store-source-filename (project-name filename subtree-p)
-    (org-add-option-or-property
+    (org-set-option-or-property
      (org-pm-make-filename-property-name project-name)
      filename
      subtree-p))
 
   (defun org-pm-store-source-subdirectory (project-name subdir subtree-p)
-    (org-add-option-or-property
+    (org-set-option-or-property
      (org-pm-make-subdirectory-property-name project-name)
      subdir
      subtree-p))
@@ -689,6 +699,27 @@ Note: a reset:
      (lambda (x) x)
      (delete-dups (cons word (split-string (or string "") " ")))
      " "))
+
+  (defun org-set-option-or-property (option value &optional subtree-p)
+    "Set option or property value in buffer."
+    (if subtree-p
+        (org-set-property option value)
+      (org-set-option option value)))
+
+  (defun org-set-option (option value)
+    "Could be incorporated as variant in org-add-option."
+    (save-excursion
+      (save-restriction
+        (widen)
+        (goto-char (point-min))
+        (let* ((found
+                (re-search-forward (org-make-options-regexp (list option)) nil t))
+               (found-string (if found (match-string 2) "")))
+          (if found
+              (kill-whole-line)
+            (goto-char (point-min)))
+          (insert
+           (concat "#+" option ": " value "\n"))))))
 #+END_SRC
 
 * Creation and Deployment of Site on Server
@@ -697,7 +728,8 @@ Note: a reset:
 :END:
 
 
-* Local Projects
+* Extensions
+** Local Projects
 :PROPERTIES:
 :DATE:     <2015-05-17 Sun 17:57>
 :END:
@@ -720,6 +752,51 @@ When developing, one may want to keep all files (css, js, source files, exports)
 
   (global-set-key (kbd "H-e H-m") 'org-pm-menu-local)
 #+END_SRC
+
+** STARTED mmenu.js Support
+:PROPERTIES:
+:DATE:     <2015-05-18 Mon 07:38>
+:END:
+
+Modify =org-html-toc= for compatibility with mmenu.js (http://mmenu.frebsite.nl/).  The alternate, mmenu compatible format for table of contents is only created if property =mmenu:= is not-nil in the project's info-plist. It can be set either by options in the file or section or by a command (to be implented!).
+
+*NOTE: Instead of modifying =org-html-toc= a different approach should be taken.  If mmenu.js version is to be produced, then use a different top-level function instead of =org-html-publish-to-html=.  Define funciton =org-html-pubish-to-html-mmenu= which places a custom =TOC= made by =org-html-toc-mmenu= variant function in the bottom of the file, outside the =contents= div, as well as adjusting other details of the file's html structure for compatibility with mmenu.*
+
+#+BEGIN_SRC emacs-lisp
+  (defun org-html-toc (depth info)
+    "Build a table of contents.
+  DEPTH is an integer specifying the depth of the table.  INFO is a
+  plist used as a communication channel.  Return the table of
+  contents as a string, or nil if it is empty.
+
+  This is a variant that makes a mmenu.js compatible version of the TOC
+  if variable mmenu or info plist property :mmenu is set."
+    (let ((toc-entries
+       (mapcar (lambda (headline)
+             (cons (org-html--format-toc-headline headline info)
+               (org-export-get-relative-level headline info)))
+           (org-export-collect-headlines info depth)))
+      (outer-tag (if (and (org-html-html5-p info)
+                  (plist-get info :html-html5-fancy))
+                 "nav"
+               "div")))
+      (when toc-entries
+        (if (or mmenu-p (plist-get info :mmenu))
+            (concat "<nav id=\"menu\">\n"
+                    (org-html--toc-text toc-entries)
+                    "</nav>\n")
+          (concat (format "<%s id=\"table-of-contents\">\n" outer-tag)
+                   (format "<h%d>%s</h%d>\n"
+                           org-html-toplevel-hlevel
+                           (org-html--translate "Table of Contents" info)
+                           org-html-toplevel-hlevel)
+                   "<div id=\"text-table-of-contents\">"
+                   (org-html--toc-text toc-entries)
+                   "</div>\n"
+                   (format "</%s>\n" outer-tag))))))
+
+#+END_SRC
+
 * Provide package org-pm
 #+BEGIN_SRC emacs-lisp
 (provide 'org-pm)

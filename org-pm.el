@@ -76,6 +76,12 @@ Create directory if needed."
 (defvar org-pm-last-saved-source-path ""
   "org-pm-last-exported-file-path is computed from this variable.")
 
+(defvar mmenu-p nil
+  "Optionally produce TOC in format compatible with mmenu.js
+(http://mmenu.frebsite.nl/).
+This is a first draft using a variable as switch.  To be improved...
+See function: org-html-toc extended in org-pm.")
+
 (global-set-key (kbd "H-e m") 'org-pm-menu)
 (global-set-key (kbd "<f14> m") 'org-pm-menu)
 (global-set-key (kbd "<f14> <f14>") 'org-pm-menu)
@@ -255,6 +261,8 @@ Create directory if needed."
          (contents-path (or (buffer-file-name) (buffer-name)))
          (source-file-path (org-pm-query-source-file-path project-name subtree-p))
          (source-file-dir (file-name-directory source-file-path)))
+    (org-pm-store-source-filename
+     project-name (file-name-nondirectory source-file-path) subtree-p)
     (if subtree-p (org-copy-subtree))
     (unless (file-exists-p source-file-dir) (mkdir source-file-dir t))
     (find-file source-file-path)
@@ -342,7 +350,8 @@ string and add it to the top of the org source file for publishing."
   (let* ((subdir
           (concat
            org-pm-target-subdir
-           (or (org-get-option (org-pm-make-subdir-option project-name)) "")))
+           (or (org-get-option
+                (org-pm-make-subdirectory-property-name project-name)) "")))
          (includes-path (org-pm-get-includes-dir project-name))
          (includes-string "")
          (relative-path "includes/"))
@@ -443,10 +452,8 @@ string and add it to the top of the org source file for publishing."
              (file-name-sans-extension
               (org-pm-make-source-file-name project-name subtree-p))))))
          (dir (org-pm-get-source-file-dir project-name subtree-p)))
-    (org-add-option-or-property
-     ;; TODO: construct option name here!
-     filename
-     subtree-p)
+    ;; done by org-pm-save-org-source!:
+    ;; (org-pm-store-source-filename project-name filename subtree-p)
     (concat dir "/" filename ".org")))
 
 (defun strip-nonalpha (input-string)
@@ -473,12 +480,11 @@ string and add it to the top of the org source file for publishing."
   If corresponding property of file or subtree has a value, return it.
   Otherwise construct string from file name or subtree heading."
   (strip-nonalpha
-   (or (org-pm-get-project-attribute project-name "filename" subtree-p)
-       (if subtree-p
-           (concat
+   (file-name-sans-extension
+    (or (org-pm-get-project-attribute project-name "filename" subtree-p)
+        (if subtree-p
             (strip-nonalpha (org-pm-get-subtree-headline))
-            ".org")
-         (file-name-nondirectory (buffer-file-name))))))
+          (file-name-nondirectory (buffer-file-name)))))))
 
 (defun org-pm-get-target-file-path (project-name subtree-p &optional file-type)
   "Get full path where file/subtree will be exported.
@@ -519,13 +525,13 @@ string and add it to the top of the org source file for publishing."
       (org-get-option property-name))))
 
 (defun org-pm-store-source-filename (project-name filename subtree-p)
-  (org-add-option-or-property
+  (org-set-option-or-property
    (org-pm-make-filename-property-name project-name)
    filename
    subtree-p))
 
 (defun org-pm-store-source-subdirectory (project-name subdir subtree-p)
-  (org-add-option-or-property
+  (org-set-option-or-property
    (org-pm-make-subdirectory-property-name project-name)
    subdir
    subtree-p))
@@ -594,6 +600,27 @@ See also org-set-option-or-property."
    (delete-dups (cons word (split-string (or string "") " ")))
    " "))
 
+(defun org-set-option-or-property (option value &optional subtree-p)
+  "Set option or property value in buffer."
+  (if subtree-p
+      (org-set-property option value)
+    (org-set-option option value)))
+
+(defun org-set-option (option value)
+  "Could be incorporated as variant in org-add-option."
+  (save-excursion
+    (save-restriction
+      (widen)
+      (goto-char (point-min))
+      (let* ((found
+              (re-search-forward (org-make-options-regexp (list option)) nil t))
+             (found-string (if found (match-string 2) "")))
+        (if found
+            (kill-whole-line)
+          (goto-char (point-min)))
+        (insert
+         (concat "#+" option ": " value "\n"))))))
+
 (defun org-pm-menu-local ()
   "Present org-pm-menu using current file's folder + EXPORTS as project root."
   (interactive)
@@ -608,5 +635,37 @@ See also org-set-option-or-property."
     (call-interactively 'org-pm-menu)))
 
 (global-set-key (kbd "H-e H-m") 'org-pm-menu-local)
+
+(defun org-html-toc (depth info)
+  "Build a table of contents.
+DEPTH is an integer specifying the depth of the table.  INFO is a
+plist used as a communication channel.  Return the table of
+contents as a string, or nil if it is empty.
+
+This is a variant that makes a mmenu.js compatible version of the TOC
+if variable mmenu or info plist property :mmenu is set."
+  (let ((toc-entries
+     (mapcar (lambda (headline)
+           (cons (org-html--format-toc-headline headline info)
+             (org-export-get-relative-level headline info)))
+         (org-export-collect-headlines info depth)))
+    (outer-tag (if (and (org-html-html5-p info)
+                (plist-get info :html-html5-fancy))
+               "nav"
+             "div")))
+    (when toc-entries
+      (if (or mmenu-p (plist-get info :mmenu))
+          (concat "<nav id=\"menu\">\n"
+                  (org-html--toc-text toc-entries)
+                  "</nav>\n")
+        (concat (format "<%s id=\"table-of-contents\">\n" outer-tag)
+                 (format "<h%d>%s</h%d>\n"
+                         org-html-toplevel-hlevel
+                         (org-html--translate "Table of Contents" info)
+                         org-html-toplevel-hlevel)
+                 "<div id=\"text-table-of-contents\">"
+                 (org-html--toc-text toc-entries)
+                 "</div>\n"
+                 (format "</%s>\n" outer-tag))))))
 
 (provide 'org-pm)
