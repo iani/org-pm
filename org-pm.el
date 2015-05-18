@@ -594,4 +594,19 @@ See also org-set-option-or-property."
    (delete-dups (cons word (split-string (or string "") " ")))
    " "))
 
+(defun org-pm-menu-local ()
+  "Present org-pm-menu using current file's folder + EXPORTS as project root."
+  (interactive)
+  (let ((org-pm-root-dir
+         (concat
+          (file-truename
+           (file-name-directory (buffer-file-name)))
+          "/EXPORTS")))
+    (unless (file-exists-p org-pm-root-dir)
+      (message "WILL NOW CREATE %s" org-pm-root-dir)
+      (mkdir org-pm-root-dir t))
+    (call-interactively 'org-pm-menu)))
+
+(global-set-key (kbd "H-e H-m") 'org-pm-menu-local)
+
 (provide 'org-pm)
